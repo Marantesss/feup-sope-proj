@@ -39,20 +39,21 @@ int main(int argc, char *argv[]) {
   //  }
   // *****************************
 
-  char command[256] = "ls -la ";
+  char command1[256] = "ls -la ";
+  char command2[256] = "file ";
   char out[10000];
 
   if (argc >= 2) {
-    strcat(command, argv[1]);
+    strcat(command1, argv[1]);
   }
 
-  FILE *f = popen(command, "r");
+  FILE *f1 = popen(command1, "r");
 
-  while (fgets(out, 10000, f) != NULL) {
+  while (fgets(out, 10000, f1) != NULL) {
     // printf("%s", out);
   }
 
-  pclose(f);
+  pclose(f1);
 
   char perms[256];
   char f_owner[256];
@@ -75,14 +76,35 @@ int main(int argc, char *argv[]) {
   strcpy(mod_time[1], strtok(NULL, " "));
   strcpy(mod_time[2], strtok(NULL, " "));
 
-  strcpy(f_name, strtok(NULL, " "));
+  strcpy(f_name, strtok(NULL, "\n"));
 
   printf("Permissions: %s\n", perms);
   printf("File owner: %s\n", f_owner);
   printf("File group: %s\n", f_group);
   printf("File size: %s\n", f_size);
   printf("Modification time: %s %s %s\n", mod_time[0], mod_time[1], mod_time[2]);
-  printf("File name: %s", f_name);
+  printf("File name: %s\n", f_name);
+
+  if (argc >= 2) {
+    strcat(command2, argv[1]);
+  }
+
+
+  FILE *f2 = popen(command2, "r");
+
+  while (fgets(out, 10000, f2) != NULL) {
+    // printf("%s", out);
+  }
+
+  pclose(f2);
+
+  char f_type[256];
+
+  strtok(out, " ");
+
+  strcpy(f_type, strtok(NULL, "\n"));
+
+  printf("File type: %s\n", f_type);
 
   exit(0);
 }
