@@ -1,30 +1,63 @@
 #include "utils.h"
 
 command_info *com;
+file_info *info;
 
-void print_fileinfo(file_info* info, FILE print_location) {
-    // prints in the console
-    //fwrite("ola", 1, strlen("ola"), stdout); 
+void print_fileinfo(FILE* print_location) {
+    /*
+    file_name,file_type,file_size,file_access_owner,
+    file_modification_date, file_access_date, md5,sha1,sha256
+    */
+    // ---- file name
+    fwrite(info->file_name, sizeof(char), strlen(info->file_name), print_location);
+    fwrite(",", sizeof(char), strlen(","), print_location);
+    // ---- file type
+    fwrite(info->file_type, sizeof(char), strlen(info->file_type), print_location);
+    fwrite(",", sizeof(char), strlen(","), print_location);
+    // ---- file size
+    fwrite(info->file_size, sizeof(char), strlen(info->file_size), print_location);
+    fwrite(",", sizeof(char), strlen(","), print_location);
+    // ---- file access owner permissions
+    fwrite(info->file_access_owner, sizeof(char), strlen(info->file_access_owner), print_location);
+    fwrite(",", sizeof(char), strlen(","), print_location);
+    // ---- file last modification date
+    fwrite(info->file_modification_date, sizeof(char), strlen(info->file_modification_date), print_location);
+    fwrite(",", sizeof(char), strlen(","), print_location);
+    // ---- file last access date
+    fwrite(info->file_access_date, sizeof(char), strlen(info->file_access_date), print_location);
+
+    // ---- file md5 hash code
+    if (com->cryptohash_flags[MD5_FLAG]) {
+        fwrite(",", sizeof(char), strlen(","), print_location);
+        fwrite(info->md5_hash, sizeof(char), strlen(info->md5_hash), print_location);
+    }
+    // ---- file sha1 hash code
+    if (com->cryptohash_flags[SHA1_FLAG]) {
+        fwrite(",", sizeof(char), strlen(","), print_location);
+        fwrite(info->sha1_hash, sizeof(char), strlen(info->sha1_hash), print_location);
+    }
+    // ---- file sha256 hash code
+    if (com->cryptohash_flags[SHA256_FLAG]) {
+        fwrite(info->sha256_hash, sizeof(char), strlen(info->sha256_hash), print_location);
+    }
+    fwrite("\n", sizeof(char), strlen("\n"), print_location);
 }
-
-/*
-file_name,file_type,file_size,file_access_owner,file_modification_da
-te, file_access_date, md5,sha1,sha256
-*/
 
 static void dump_stat(struct stat *st) {
     struct tm *date;
-    file_info *info = malloc(sizeof(file_info));
+    info = calloc(1, sizeof(file_info));
     // --- seeting default values
+    /*
     strcpy(info->file_name, "");
     strcpy(info->file_type, "");
-    info->file_size = 0;
+    strcpy(info->file_size, "");
     strcpy(info->file_access_owner, "");
     strcpy(info->file_modification_date, "");
     strcpy(info->file_access_date, "");
     strcpy(info->md5_hash, "");
     strcpy(info->sha1_hash, "");
     strcpy(info->sha256_hash, "");
+    */
     // ----
     
     // ---- getting file name
@@ -47,11 +80,9 @@ static void dump_stat(struct stat *st) {
     // ---- getting file type
     strcpy(info->file_type, strtok(NULL, "\n"));
     // ----
-    
-    
 
     // ---- getting size
-    info->file_size = st->st_size;
+    sprintf(info->file_size, "%ld", st->st_size);
     // ----
 
     // ---- getting permissions
@@ -65,25 +96,82 @@ static void dump_stat(struct stat *st) {
 
     // ---- getting modification date
     date = gmtime(&st->st_mtime);
-    sprintf(info->file_modification_date, ", %d-%02d-%02dT%02d:%02d:%02d, ",
+    sprintf(info->file_modification_date, "%d-%02d-%02dT%02d:%02d:%02d",
             1900 + date->tm_year, date->tm_mon, date->tm_mday, date->tm_hour, date->tm_min, date->tm_sec);
     // ----
 
     // ---- getting access date
     date = gmtime(&st->st_atime);
-    sprintf(info->file_access_date, "%d-%02d-%02dT%02d:%02d:%02d\n",
+    sprintf(info->file_access_date, "%d-%02d-%02dT%02d:%02d:%02d",
             1900 + date->tm_year, date->tm_mon, date->tm_mday, date->tm_hour, date->tm_min, date->tm_sec);
     // ----
  
     // ---- getting cryptohash
+    // ---- md5
+    if (com->cryptohash_flags[MD5_FLAG]) {
+        char md5_command[] = "md5sum ";
+        char o_command_md5[1000];
 
+        strcat(md5_command, com->directory);
+
+        FILE *fa = popen(md5_command, "r");
+
+        while (fgets(o_command_md5, 10000, fa) != NULL) {
+            // printf("%s", out);
+        }
+    
+        pclose(fa);
+
+        strcpy(info->md5_hash, strtok(o_command_md5, " "));
+    }
+    // ---- sha1
+    if (com->cryptohash_flags[SHA1_FLAG]) {
+        char sha1_command[] = "sha1sum ";
+        char o_command_sha1[1000];
+
+        strcat(sha1_command, com->directory);
+
+        FILE *fb = popen(sha1_command, "r");
+
+        while (fgets(o_command_sha1, 10000, fb) != NULL) {
+            // printf("%s", out);
+        }
+    
+        pclose(fb);
+
+        strcpy(info->sha1_hash, strtok(o_command_sha1, " "));
+    }
+    // ---- sha256
+    if (com->cryptohash_flags[SHA256_FLAG]) {
+        char sha256_command[] = "sha256sum ";
+        char o_command_sha256[1000];
+
+        strcat(sha256_command, com->directory);
+
+        FILE *fc = popen(sha256_command, "r");
+
+        while (fgets(o_command_sha256, 10000, fc) != NULL) {
+            // printf("%s", out);
+        }
+    
+        pclose(fc);
+
+        strcpy(info->sha256_hash, strtok(o_command_sha256, " "));
+    }
     // ----
 }
 
 int main(int argc, char *argv[]) {
     struct stat st;
 
-    com = malloc(sizeof(command_info));
+    com = calloc(1, sizeof(command_info));
+    /*
+    strcpy(com->directory, "");
+    strcpy(com->outfile, "");
+    strcpy(com->cryptohash, "");
+    ...
+    ...
+    */
 
     // ---- checking the maximum ammount of flags
     if (argc > 8 ) {
@@ -131,11 +219,31 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
     }
+
+    // ---- getting -h flags
+    // Returns first token  
+    char *token = strtok(com->cryptohash, ","); 
     
+    while (token != NULL) {
+        if (!strcmp(token, "md5"))
+            com->cryptohash_flags[MD5_FLAG] = 1;
+        else if (!strcmp(token, "sha1"))
+            com->cryptohash_flags[SHA1_FLAG] = 1;
+        else if (!strcmp(token, "sha256"))
+            com->cryptohash_flags[SHA256_FLAG] = 1;
+        else {
+            printf("unknown option: %s\n", token);
+            printf("Usage:\n%s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
+            exit(EXIT_FAILURE);
+        }
+        token = strtok(NULL, ","); 
+    }     
+
     // ---- getting directory
     strcpy(com->directory, argv[argc-1]);
 
-    // ---- printing the flags: TEXTING PURPOSES
+    // ---- printing the flags: TESTING PURPOSES
+    /*
     if (com->raised_flags[RECURSIVE])
         printf("-r -> Analize all files\n");
     if (com->raised_flags[CRYPTOHASH])
@@ -146,6 +254,7 @@ int main(int argc, char *argv[]) {
         printf("-v -> Create a log file\n");
 
     printf("Directory: %s\n", com->directory);
+    */
 
     // ---- getting info from directory
     if (stat(com->directory, &st) == -1) {
@@ -155,6 +264,8 @@ int main(int argc, char *argv[]) {
 
     // ---- printing the info from directory
     dump_stat(&st);
+
+    print_fileinfo(stdout);
 
     exit(EXIT_SUCCESS); 
 }
