@@ -1,89 +1,89 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <time.h>
+#include "utils.h"
 
-#define RECURSIVE   0
-#define CRYPTOHASH  1
-#define OUTFILE     2
-#define LOGFILE     3
+command_info *com;
 
-#define MAX_FILE_NAME   64
-
-int raised_flags[] = {0, 0, 0, 0};
-char directory[MAX_FILE_NAME];
-char outfile[MAX_FILE_NAME];
-char cryptohash[MAX_FILE_NAME];
+void print_fileinfo(file_info* info, FILE print_location) {
+    // prints in the console
+    //fwrite("ola", 1, strlen("ola"), stdout); 
+}
 
 /*
 file_name,file_type,file_size,file_access_owner,file_modification_da
 te, file_access_date, md5,sha1,sha256
 */
+
 static void dump_stat(struct stat *st) {
     struct tm *date;
+    file_info *info = malloc(sizeof(file_info));
+    // --- seeting default values
+    strcpy(info->file_name, "");
+    strcpy(info->file_type, "");
+    info->file_size = 0;
+    strcpy(info->file_access_owner, "");
+    strcpy(info->file_modification_date, "");
+    strcpy(info->file_access_date, "");
+    strcpy(info->md5_hash, "");
+    strcpy(info->sha1_hash, "");
+    strcpy(info->sha256_hash, "");
+    // ----
+    
+    // ---- getting file name
+    char file_command[] = "file ";
+    char o_command_file[1000];
 
-    // ---- printing basic info
-    printf("file_name, ");
+    strcat(file_command, com->directory);
 
-    switch (st->st_mode & S_IFMT) {
-    case S_IFBLK:
-        printf("block device, ");
-        break;
-    case S_IFCHR:  
-        printf("character device, ");
-        break;
-    case S_IFDIR:
-        printf("directory, ");
-        break;
-    case S_IFIFO:
-        printf("FIFO/pipe, ");
-        break;
-    case S_IFLNK:
-        printf("symlink, ");
-        break;
-    case S_IFREG:
-        printf("regular file, ");
-        break;
-    case S_IFSOCK:
-        printf("socket, ");
-        break;
-    default:
-        printf("unknown?, ");
-        break;
+    FILE *f1 = popen(file_command, "r");
+
+    while (fgets(o_command_file, 10000, f1) != NULL) {
+        // printf("%s", out);
     }
+    
+    pclose(f1);
+
+    strcpy(info->file_name, strtok(o_command_file, ": "));
+    // ----
+    
+    // ---- getting file type
+    strcpy(info->file_type, strtok(NULL, "\n"));
+    // ----
+    
+    
+
+    // ---- getting size
+    info->file_size = st->st_size;
+    // ----
 
     // ---- getting permissions
     if (st->st_mode & S_IRUSR)
-        printf("r");
+        strcat(info->file_access_owner, "r");
     if (st->st_mode & S_IWUSR)
-        printf("w");
+        strcat(info->file_access_owner, "w");
     if (st->st_mode & S_IXUSR)
-        printf("x");
+        strcat(info->file_access_owner, "x");
+    // ----
 
-    /*
-    S_IRUSR  00400 user has read permission
-
-    S_IWUSR  00200 user has write permission
-
-    S_IXUSR  00100 user has execute permission
-    */
-
-    // ---- printing modification date
+    // ---- getting modification date
     date = gmtime(&st->st_mtime);
-    printf(", %d-%02d-%02dT%02d:%02d:%02d, ", 1900 + date->tm_year, date->tm_mon, date->tm_mday,
-                                            date->tm_hour, date->tm_min, date->tm_sec);
+    sprintf(info->file_modification_date, ", %d-%02d-%02dT%02d:%02d:%02d, ",
+            1900 + date->tm_year, date->tm_mon, date->tm_mday, date->tm_hour, date->tm_min, date->tm_sec);
+    // ----
 
-    // ---- printing access date
+    // ---- getting access date
     date = gmtime(&st->st_atime);
-    printf("%d-%02d-%02dT%02d:%02d:%02d\n", 1900 + date->tm_year, date->tm_mon, date->tm_mday,
-                                            date->tm_hour, date->tm_min, date->tm_sec);
+    sprintf(info->file_access_date, "%d-%02d-%02dT%02d:%02d:%02d\n",
+            1900 + date->tm_year, date->tm_mon, date->tm_mday, date->tm_hour, date->tm_min, date->tm_sec);
+    // ----
+ 
+    // ---- getting cryptohash
+
+    // ----
 }
 
-int main(int argc, char *argv[]) {   
+int main(int argc, char *argv[]) {
     struct stat st;
+
+    com = malloc(sizeof(command_info));
 
     // ---- checking the maximum ammount of flags
     if (argc > 8 ) {
@@ -101,30 +101,30 @@ int main(int argc, char *argv[]) {
     for (int i = 1; i < argc - 1; i++) {
         // --- -r flag
         if (!strcmp(argv[i], "-r")) {
-            raised_flags[RECURSIVE] = 1;
+            com->raised_flags[RECURSIVE] = 1;
         // --- -h flag
         } else if (!strcmp(argv[i], "-h")) {
-            raised_flags[CRYPTOHASH] = 1;
+            com->raised_flags[CRYPTOHASH] = 1;
             i++;
             if (!(strcmp(argv[i], "-o") && strcmp(argv[i], "-v") && strcmp(argv[i], "-r"))) {
                 printf("Option %s needs a value\n", argv[i-1]);
                 printf("Usage:\n%s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
                 exit(EXIT_FAILURE);
             }
-            strcpy(cryptohash, argv[i]);
+            strcpy(com->cryptohash, argv[i]);
         // --- -o flag
         } else if (!strcmp(argv[i], "-o")) {
-            raised_flags[OUTFILE] = 1;
+            com->raised_flags[OUTFILE] = 1;
             i++;
             if (!(strcmp(argv[i], "-h") && strcmp(argv[i], "-v") && strcmp(argv[i], "-r"))) {
                 printf("Option %s needs a value\n", argv[i-1]);
                 printf("Usage:\n%s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
                 exit(EXIT_FAILURE);
             }
-            strcpy(outfile, argv[i]);
+            strcpy(com->outfile, argv[i]);
         // --- -v flag
         } else if (!strcmp(argv[i], "-v")) {
-            raised_flags[LOGFILE] = 1;
+            com->raised_flags[LOGFILE] = 1;
         } else {
             printf("unknown option: %s\n", argv[i]);
             printf("Usage:\n%s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
@@ -133,22 +133,22 @@ int main(int argc, char *argv[]) {
     }
     
     // ---- getting directory
-    strcpy(directory, argv[argc-1]);
+    strcpy(com->directory, argv[argc-1]);
 
     // ---- printing the flags: TEXTING PURPOSES
-    if (raised_flags[RECURSIVE])
+    if (com->raised_flags[RECURSIVE])
         printf("-r -> Analize all files\n");
-    if (raised_flags[CRYPTOHASH])
-        printf("-h -> Calculate one or more \"fingerprints\" with algorithm(s): %s\n", cryptohash);
-    if (raised_flags[OUTFILE])
-        printf("-o -> Store collected data on filename: %s\n", outfile);
-    if (raised_flags[LOGFILE])
+    if (com->raised_flags[CRYPTOHASH])
+        printf("-h -> Calculate one or more \"fingerprints\" with algorithm(s): %s\n", com->cryptohash);
+    if (com->raised_flags[OUTFILE])
+        printf("-o -> Store collected data on filename: %s\n", com->outfile);
+    if (com->raised_flags[LOGFILE])
         printf("-v -> Create a log file\n");
 
-    printf("Directory: %s\n", directory);
+    printf("Directory: %s\n", com->directory);
 
     // ---- getting info from directory
-    if (stat(directory, &st) == -1) {
+    if (stat(com->directory, &st) == -1) {
         perror("stat");
         exit(EXIT_FAILURE);
     }
