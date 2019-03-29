@@ -222,12 +222,12 @@ int main(int argc, char *argv[]) {
     }
 
     // ---- getting output location
+    // "w" flag creates a file if it does not already exist
+    // w --> O_WRONLY | O_CREAT | O_TRUNC
     if (com->raised_flags[OUTFILE])
         output = fopen(com->outfile, "w");
     else
         output = stdout;
-    
-    
 
     // ---- getting -h flags
     // Returns first token  
