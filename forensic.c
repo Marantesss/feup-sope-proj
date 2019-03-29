@@ -163,6 +163,7 @@ static void dump_stat(struct stat *st) {
 
 int main(int argc, char *argv[]) {
     struct stat st;
+    FILE * output;
 
     com = calloc(1, sizeof(command_info));
     /*
@@ -220,6 +221,14 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // ---- getting output location
+    if (com->raised_flags[OUTFILE])
+        output = fopen(com->outfile, "w");
+    else
+        output = stdout;
+    
+    
+
     // ---- getting -h flags
     // Returns first token  
     char *token = strtok(com->cryptohash, ","); 
@@ -265,7 +274,7 @@ int main(int argc, char *argv[]) {
     // ---- printing the info from directory
     dump_stat(&st);
 
-    print_fileinfo(stdout);
+    print_fileinfo(output);
 
     exit(EXIT_SUCCESS); 
 }
