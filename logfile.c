@@ -22,9 +22,9 @@ int main(int argc, char *argv[], char *envp[]){
 
     diff = (double) (1000.00*(tend.tv_sec - tstart.tv_sec) + 1.0e-9*(tend.tv_nsec - tstart.tv_nsec));
 
-    printf("%.2lf - %ld\n",
+    printf("%.2lf - %08ld\n",
            diff,
-            (long )pid);
+           (long )pid);
 
     // diff = (double) (1000.00*(end.time - start.time) + (end.millitm - start.millitm));
     // printf("%.2lf\n", diff); //tempo atual em milisegundos com 2 casa decimais, SPOILER(as casas decimais vao ser sempre 0)
