@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <sys/timeb.h>
 #include <time.h>
+#include <dirent.h>
 
 // ---- Command flags
 #define FLAG_NUMBER     4
