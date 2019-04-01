@@ -7,11 +7,12 @@
 
 int main(int argc, char *argv[], char *envp[]){
 
-    char inst[MAX_FILE_NAME], pid[PID_NUMBER], act[MAX_FILE_NAME];
+    //char inst[MAX_FILE_NAME], pid[PID_NUMBER], act[MAX_FILE_NAME];
     struct timespec tstart, tend;  
     //struct timeb start, end;  
     double diff;
-    int i = 0;
+    pid_t pid = getpid();
+
     
     clock_gettime(CLOCK_MONOTONIC, &tstart);
     //ftime(&start);
@@ -19,8 +20,11 @@ int main(int argc, char *argv[], char *envp[]){
     //ftime(&end);
     clock_gettime(CLOCK_MONOTONIC, &tend);
 
-    printf("some_long_computation took about %.2lf milliseconds\n",
-           (double) (1000.00*(tend.tv_sec - tstart.tv_sec) + 1.0e-9*(tend.tv_nsec - tstart.tv_nsec)));
+    diff = (double) (1000.00*(tend.tv_sec - tstart.tv_sec) + 1.0e-9*(tend.tv_nsec - tstart.tv_nsec));
+
+    printf("%.2lf - %ld\n",
+           diff,
+            (long )pid);
 
     // diff = (double) (1000.00*(end.time - start.time) + (end.millitm - start.millitm));
     // printf("%.2lf\n", diff); //tempo atual em milisegundos com 2 casa decimais, SPOILER(as casas decimais vao ser sempre 0)
