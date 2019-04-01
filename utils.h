@@ -4,6 +4,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/timeb.h>
 #include <time.h>
 
 // ---- Command flags
@@ -28,7 +29,7 @@
 #define MAX_FILE_NAME       64
 #define ACCESS_PERMISSIONS  3
 
-
+#define PID_NUMBER 9
 
 typedef struct {
     char file_name[MAX_FILE_NAME+1];              /**< @brief  */
@@ -50,5 +51,6 @@ typedef struct {
     char cryptohash[MAX_FILE_NAME+1];
     int cryptohash_flags[MAX_CRYPTOHASH_FLAGS+1];
     int raised_flags[FLAG_NUMBER+1];
+    char logfilename[MAX_FILE_NAME+1];
 } command_info;
 

@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
 
     // ---- checking the maximum ammount of flags
     if (argc > 8 ) {
-        printf("Error: Too many arguments");
+        printf("Error: Too many arguments\n");
         printf("Usage: %s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
@@ -214,6 +214,11 @@ int main(int argc, char *argv[]) {
         // --- -v flag
         } else if (!strcmp(argv[i], "-v")) {
             com->raised_flags[LOGFILE] = 1;
+            if (!(strcmp(argv[i], "-h") && strcmp(argv[i], "-o") && strcmp(argv[i], "-r"))) {
+                printf("Option %s needs a value\n", argv[i-1]);
+                printf("Usage:\n%s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
+                exit(EXIT_FAILURE);
+            }
         } else {
             printf("unknown option: %s\n", argv[i]);
             printf("Usage:\n%s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
