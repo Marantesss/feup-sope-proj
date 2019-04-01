@@ -8,20 +8,22 @@
 int main(int argc, char *argv[], char *envp[]){
 
     char inst[MAX_FILE_NAME], pid[PID_NUMBER], act[MAX_FILE_NAME];
-    struct timeb start, end;
+    struct timespec tstart, tend;  
+    //struct timeb start, end;  
     double diff;
     int i = 0;
+    
+    clock_gettime(CLOCK_MONOTONIC, &tstart);
+    //ftime(&start);
+    scanf("%lf",&diff);
+    //ftime(&end);
+    clock_gettime(CLOCK_MONOTONIC, &tend);
 
-    ftime(&start);
+    printf("some_long_computation took about %.2lf milliseconds\n",
+           (double) (1000.00*(tend.tv_sec - tstart.tv_sec) + 1.0e-9*(tend.tv_nsec - tstart.tv_nsec)));
 
-    while(i++ < 2)
-        scanf("%lf", &diff);
-
-    ftime(&end);
-
-    diff = (double) (1000.00*(end.time - start.time) + (end.millitm - start.millitm));
-    printf("%.2lf\n", diff); //tempo atual em milisegundos com 2 casa decimais, SPOILER(as casas decimais vao ser sempre 0)
-
+    // diff = (double) (1000.00*(end.time - start.time) + (end.millitm - start.millitm));
+    // printf("%.2lf\n", diff); //tempo atual em milisegundos com 2 casa decimais, SPOILER(as casas decimais vao ser sempre 0)
     FILE *f;
     char logfilename[MAX_FILE_NAME + 1];
 
