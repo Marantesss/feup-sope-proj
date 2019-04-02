@@ -75,6 +75,8 @@ void dump_stat(char* path, file_info *info) {
     // ----
 
     // ---- getting permissions
+    strcpy(info->file_access_owner, "");
+    
     if (st.st_mode & S_IRUSR)
         strcat(info->file_access_owner, "r");
     if (st.st_mode & S_IWUSR)
