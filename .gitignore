@@ -1,6 +1,9 @@
-# ignore all hiden files
+# ignore all hidden files
 .*
 
 # ignore all binary files
 *.o
 *.out
+
+#ignore all text files
+*.txt

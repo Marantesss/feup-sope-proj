@@ -11,8 +11,7 @@ void listdir(char *path, size_t size) {
     size_t len = strlen(path);
 
     if (!(dir = opendir(path))) {
-        fprintf(stderr, "path not found: %s: %s\n",
-                path, strerror(errno));
+        fprintf(stderr, "path not found: %s: %s\n", path, strerror(errno));
         return;
     }
 
@@ -20,7 +19,7 @@ void listdir(char *path, size_t size) {
     while ((entry = readdir(dir)) != NULL) {
         char *name = entry->d_name;
         if (entry->d_type == DT_DIR) {
-            if (!strcmp(name, ".") || !strcmp(name, ".."))
+            if (!strcmp(name, ".") || !strcmp(name, ".."))//|| !strcmp(name, ".vscode") || !strcmp(name, ".git"))
                 continue;
             if (len + strlen(name) + 2 > size) {
                 fprintf(stderr, "path too long: %s/%s\n", path, name);
@@ -38,7 +37,7 @@ void listdir(char *path, size_t size) {
 }
 
 int main(void) {
-    char path[1024] = "forensic.c";
-    listdir(path, sizeof path);
+    char path[1024] = ".";
+    listdir(path, sizeof(path));
     return 0;
 }

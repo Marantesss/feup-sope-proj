@@ -1,13 +1,8 @@
 #include "utils.h"
 
-command_info *com;
-file_info *info;
+command_info *command = NULL; /**< @brief Struct containing command information*/
 
-void print_fileinfo(FILE* print_location) {
-    /*
-    file_name,file_type,file_size,file_access_owner,
-    file_modification_date, file_access_date, md5,sha1,sha256
-    */
+void print_fileinfo(FILE* print_location, file_info* info) {
     // ---- file name
     fwrite(info->file_name, sizeof(char), strlen(info->file_name), print_location);
     fwrite(",", sizeof(char), strlen(","), print_location);
@@ -27,44 +22,38 @@ void print_fileinfo(FILE* print_location) {
     fwrite(info->file_access_date, sizeof(char), strlen(info->file_access_date), print_location);
 
     // ---- file md5 hash code
-    if (com->cryptohash_flags[MD5_FLAG]) {
+    if (command->cryptohash_flags[MD5_FLAG]) {
         fwrite(",", sizeof(char), strlen(","), print_location);
         fwrite(info->md5_hash, sizeof(char), strlen(info->md5_hash), print_location);
     }
     // ---- file sha1 hash code
-    if (com->cryptohash_flags[SHA1_FLAG]) {
+    if (command->cryptohash_flags[SHA1_FLAG]) {
         fwrite(",", sizeof(char), strlen(","), print_location);
         fwrite(info->sha1_hash, sizeof(char), strlen(info->sha1_hash), print_location);
     }
     // ---- file sha256 hash code
-    if (com->cryptohash_flags[SHA256_FLAG]) {
+    if (command->cryptohash_flags[SHA256_FLAG]) {
+        fwrite(",", sizeof(char), strlen(","), print_location);
         fwrite(info->sha256_hash, sizeof(char), strlen(info->sha256_hash), print_location);
     }
     fwrite("\n", sizeof(char), strlen("\n"), print_location);
 }
 
-static void dump_stat(struct stat *st) {
+void dump_stat(char* path, file_info *info) {
+    struct stat st;
     struct tm *date;
-    info = calloc(1, sizeof(file_info));
-    // --- seeting default values
-    /*
-    strcpy(info->file_name, "");
-    strcpy(info->file_type, "");
-    strcpy(info->file_size, "");
-    strcpy(info->file_access_owner, "");
-    strcpy(info->file_modification_date, "");
-    strcpy(info->file_access_date, "");
-    strcpy(info->md5_hash, "");
-    strcpy(info->sha1_hash, "");
-    strcpy(info->sha256_hash, "");
-    */
-    // ----
+
+    // ---- getting info from directory
+    if (stat(path, &st) == -1) {
+        perror("stat");
+        exit(EXIT_FAILURE);
+    }
     
     // ---- getting file name
     char file_command[] = "file ";
     char o_command_file[1000];
 
-    strcat(file_command, com->directory);
+    strcat(file_command, path);
 
     FILE *f1 = popen(file_command, "r");
 
@@ -82,37 +71,37 @@ static void dump_stat(struct stat *st) {
     // ----
 
     // ---- getting size
-    sprintf(info->file_size, "%ld", st->st_size);
+    sprintf(info->file_size, "%ld", st.st_size);
     // ----
 
     // ---- getting permissions
-    if (st->st_mode & S_IRUSR)
+    if (st.st_mode & S_IRUSR)
         strcat(info->file_access_owner, "r");
-    if (st->st_mode & S_IWUSR)
+    if (st.st_mode & S_IWUSR)
         strcat(info->file_access_owner, "w");
-    if (st->st_mode & S_IXUSR)
+    if (st.st_mode & S_IXUSR)
         strcat(info->file_access_owner, "x");
     // ----
 
     // ---- getting modification date
-    date = gmtime(&st->st_mtime);
+    date = gmtime(&st.st_mtime);
     sprintf(info->file_modification_date, "%d-%02d-%02dT%02d:%02d:%02d",
             1900 + date->tm_year, date->tm_mon, date->tm_mday, date->tm_hour, date->tm_min, date->tm_sec);
     // ----
 
     // ---- getting access date
-    date = gmtime(&st->st_atime);
+    date = gmtime(&st.st_atime);
     sprintf(info->file_access_date, "%d-%02d-%02dT%02d:%02d:%02d",
             1900 + date->tm_year, date->tm_mon, date->tm_mday, date->tm_hour, date->tm_min, date->tm_sec);
     // ----
  
     // ---- getting cryptohash
     // ---- md5
-    if (com->cryptohash_flags[MD5_FLAG]) {
+    if (command->cryptohash_flags[MD5_FLAG]) {
         char md5_command[] = "md5sum ";
         char o_command_md5[1000];
 
-        strcat(md5_command, com->directory);
+        strcat(md5_command, path);
 
         FILE *fa = popen(md5_command, "r");
 
@@ -125,11 +114,11 @@ static void dump_stat(struct stat *st) {
         strcpy(info->md5_hash, strtok(o_command_md5, " "));
     }
     // ---- sha1
-    if (com->cryptohash_flags[SHA1_FLAG]) {
+    if (command->cryptohash_flags[SHA1_FLAG]) {
         char sha1_command[] = "sha1sum ";
         char o_command_sha1[1000];
 
-        strcat(sha1_command, com->directory);
+        strcat(sha1_command, path);
 
         FILE *fb = popen(sha1_command, "r");
 
@@ -142,11 +131,11 @@ static void dump_stat(struct stat *st) {
         strcpy(info->sha1_hash, strtok(o_command_sha1, " "));
     }
     // ---- sha256
-    if (com->cryptohash_flags[SHA256_FLAG]) {
+    if (command->cryptohash_flags[SHA256_FLAG]) {
         char sha256_command[] = "sha256sum ";
         char o_command_sha256[1000];
 
-        strcat(sha256_command, com->directory);
+        strcat(sha256_command, path);
 
         FILE *fc = popen(sha256_command, "r");
 
@@ -161,22 +150,69 @@ static void dump_stat(struct stat *st) {
     // ----
 }
 
+void listdir(char* path, FILE* print_location, file_info* info) {
+    DIR *dir;
+    struct dirent *entry;
+    size_t len = strlen(path);
+
+    if (!(dir = opendir(path))) {
+        perror("in listdir() - path");
+        exit(EXIT_FAILURE);
+    }
+
+    //fwrite(path, sizeof(char), strlen(path), print_location);
+    while ((entry = readdir(dir)) != NULL) {
+        char *name = entry->d_name;
+        // ---- directory is a folder and -r flag is turned on
+        if (entry->d_type == DT_DIR) {
+            if (!strcmp(name, ".") || !strcmp(name, ".."))
+                continue;
+            else if (command->raised_flags[RECURSIVE]) {
+                if (path[len-1] != '/') {
+                    path[len] = '/';
+                    strcpy(path + len + 1, name);
+                } else {
+                    strcpy(path + len, name);
+                }
+                listdir(path, print_location, info);
+                path[len] = '\0';
+            }
+        }
+        // ---- directory is a file
+        else {
+            if (path[len-1] != '/') {
+                path[len] = '/';
+                strcpy(path + len + 1, name);
+            } else {
+                strcpy(path + len, name);
+            }
+            // ---- getting information from directory
+            dump_stat(path, info);
+            // ---- printing the info from directory
+            print_fileinfo(print_location, info);
+            path[len] = '\0';
+        }
+    }
+    closedir(dir);
+}
+
 int main(int argc, char *argv[]) {
     struct stat st;
-    FILE * output;
+    FILE * print_location;
 
-    com = calloc(1, sizeof(command_info));
-    /*
-    strcpy(com->directory, "");
-    strcpy(com->outfile, "");
-    strcpy(com->cryptohash, "");
-    ...
-    ...
-    */
+    // ---- allocating memory for command_info and file_info
+    file_info *info = calloc(1, sizeof(file_info));
+    command = calloc(1, sizeof(command_info));
 
-    // ---- checking the maximum ammount of flags
+    // ---- checking the minimum ammount of argumrnts
+    if (argc < 2 ) {
+        printf("Error: Too few arguments\n");
+        printf("Usage: %s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+    // ---- checking the maximum ammount of arguments
     if (argc > 8 ) {
-        printf("Error: Too many arguments");
+        printf("Error: Too many arguments\n");
         printf("Usage: %s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
@@ -190,30 +226,35 @@ int main(int argc, char *argv[]) {
     for (int i = 1; i < argc - 1; i++) {
         // --- -r flag
         if (!strcmp(argv[i], "-r")) {
-            com->raised_flags[RECURSIVE] = 1;
+            command->raised_flags[RECURSIVE] = 1;
         // --- -h flag
         } else if (!strcmp(argv[i], "-h")) {
-            com->raised_flags[CRYPTOHASH] = 1;
+            command->raised_flags[CRYPTOHASH] = 1;
             i++;
             if (!(strcmp(argv[i], "-o") && strcmp(argv[i], "-v") && strcmp(argv[i], "-r"))) {
                 printf("Option %s needs a value\n", argv[i-1]);
                 printf("Usage:\n%s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
                 exit(EXIT_FAILURE);
             }
-            strcpy(com->cryptohash, argv[i]);
+            strcpy(command->cryptohash, argv[i]);
         // --- -o flag
         } else if (!strcmp(argv[i], "-o")) {
-            com->raised_flags[OUTFILE] = 1;
+            command->raised_flags[OUTFILE] = 1;
             i++;
             if (!(strcmp(argv[i], "-h") && strcmp(argv[i], "-v") && strcmp(argv[i], "-r"))) {
                 printf("Option %s needs a value\n", argv[i-1]);
                 printf("Usage:\n%s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
                 exit(EXIT_FAILURE);
             }
-            strcpy(com->outfile, argv[i]);
+            strcpy(command->outfile, argv[i]);
         // --- -v flag
         } else if (!strcmp(argv[i], "-v")) {
-            com->raised_flags[LOGFILE] = 1;
+            command->raised_flags[LOGFILE] = 1;
+            if (!(strcmp(argv[i], "-h") && strcmp(argv[i], "-o") && strcmp(argv[i], "-r"))) {
+                printf("Option %s needs a value\n", argv[i-1]);
+                printf("Usage:\n%s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
+                exit(EXIT_FAILURE);
+            }
         } else {
             printf("unknown option: %s\n", argv[i]);
             printf("Usage:\n%s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
@@ -224,22 +265,22 @@ int main(int argc, char *argv[]) {
     // ---- getting output location
     // "w" flag creates a file if it does not already exist
     // w --> O_WRONLY | O_CREAT | O_TRUNC
-    if (com->raised_flags[OUTFILE])
-        output = fopen(com->outfile, "w");
+    if (command->raised_flags[OUTFILE])
+        print_location = fopen(command->outfile, "w");
     else
-        output = stdout;
+        print_location = stdout;
 
     // ---- getting -h flags
     // Returns first token  
-    char *token = strtok(com->cryptohash, ","); 
+    char *token = strtok(command->cryptohash, ","); 
     
     while (token != NULL) {
         if (!strcmp(token, "md5"))
-            com->cryptohash_flags[MD5_FLAG] = 1;
+            command->cryptohash_flags[MD5_FLAG] = 1;
         else if (!strcmp(token, "sha1"))
-            com->cryptohash_flags[SHA1_FLAG] = 1;
+            command->cryptohash_flags[SHA1_FLAG] = 1;
         else if (!strcmp(token, "sha256"))
-            com->cryptohash_flags[SHA256_FLAG] = 1;
+            command->cryptohash_flags[SHA256_FLAG] = 1;
         else {
             printf("unknown option: %s\n", token);
             printf("Usage:\n%s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
@@ -249,31 +290,16 @@ int main(int argc, char *argv[]) {
     }     
 
     // ---- getting directory
-    strcpy(com->directory, argv[argc-1]);
+    strcpy(command->directory, argv[argc-1]);
 
-    // ---- printing the flags: TESTING PURPOSES
-    /*
-    if (com->raised_flags[RECURSIVE])
-        printf("-r -> Analize all files\n");
-    if (com->raised_flags[CRYPTOHASH])
-        printf("-h -> Calculate one or more \"fingerprints\" with algorithm(s): %s\n", com->cryptohash);
-    if (com->raised_flags[OUTFILE])
-        printf("-o -> Store collected data on filename: %s\n", com->outfile);
-    if (com->raised_flags[LOGFILE])
-        printf("-v -> Create a log file\n");
-    printf("Directory: %s\n", com->directory);
-    */
-
-    // ---- getting info from directory
-    if (stat(com->directory, &st) == -1) {
-        perror("stat");
+    // ---- making sure directory exists
+    if( access(command->directory, F_OK ) == -1 ) {
+        printf("%s: no such file or directory\n", command->directory);
         exit(EXIT_FAILURE);
     }
 
-    // ---- printing the info from directory
-    dump_stat(&st);
-
-    print_fileinfo(output);
+    // ---- looping through every file
+    listdir(command->directory, print_location, info);
 
     exit(EXIT_SUCCESS); 
 }
