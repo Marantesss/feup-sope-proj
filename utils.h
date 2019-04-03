@@ -8,6 +8,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <dirent.h>
+#include <errno.h>
 
 // ---- Command flags
 #define FLAG_NUMBER     4
