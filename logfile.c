@@ -42,5 +42,7 @@ int main(int argc, char *argv[], char *envp[]){
     if (f == NULL)
         return 1;
 
+    fclose(f);
+
     return 0;
 }

@@ -2,6 +2,18 @@
 
 command_info *command = NULL; /**< @brief Struct containing command information*/
 
+int dirs = 0;
+int files = 0;
+
+void sig_files_handler(int files){
+    files++;
+}
+
+void sig_dirs_handler(int dirs){
+    dirs++;
+    printf("New directory: %d/%d directories/files at this time.\n", dirs, files);
+}
+
 void print_fileinfo(FILE* print_location, file_info* info) {
     // ---- file name
     fwrite(info->file_name, sizeof(char), strlen(info->file_name), print_location);
@@ -156,6 +168,9 @@ void listdir(char* path, FILE* print_location, file_info* info) {
     DIR *dir;
     struct dirent *entry;
     size_t len = strlen(path);
+    //struct stat path_stat;
+    //stat(path, &path_stat);
+    //S_ISREG(path_stat.st_mode); //verifica se o path é file ou dir ou outra cena, might be helpful
 
     if (!(dir = opendir(path))) {
         perror("in listdir() - path");
@@ -167,6 +182,7 @@ void listdir(char* path, FILE* print_location, file_info* info) {
         char *name = entry->d_name;
         // ---- directory is a folder and -r flag is turned on
         if (entry->d_type == DT_DIR) {
+            //kill(getpid(), SIGUSR1);
             if (!strcmp(name, ".") || !strcmp(name, ".."))
                 continue;
             else if (command->raised_flags[RECURSIVE]) {
@@ -182,6 +198,7 @@ void listdir(char* path, FILE* print_location, file_info* info) {
         }
         // ---- directory is a file
         else {
+            //kill(getpid(), SIGUSR2);
             if (path[len-1] != '/') {
                 path[len] = '/';
                 strcpy(path + len + 1, name);
@@ -199,6 +216,8 @@ void listdir(char* path, FILE* print_location, file_info* info) {
 }
 
 int main(int argc, char *argv[]) {
+    signal(SIGUSR1, sig_dirs_handler);
+    signal(SIGUSR2, sig_files_handler);
     struct stat st;
     FILE * print_location;
 
