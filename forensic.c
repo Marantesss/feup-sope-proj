@@ -156,6 +156,7 @@ void listdir(char* path, FILE* print_location, file_info* info) {
     DIR *dir;
     struct dirent *entry;
     size_t len = strlen(path);
+    pid_t pid;
 
     if (!(dir = opendir(path))) {
         perror("in listdir() - path");
@@ -170,14 +171,18 @@ void listdir(char* path, FILE* print_location, file_info* info) {
             if (!strcmp(name, ".") || !strcmp(name, ".."))
                 continue;
             else if (command->raised_flags[RECURSIVE]) {
-                if (path[len-1] != '/') {
-                    path[len] = '/';
-                    strcpy(path + len + 1, name);
-                } else {
-                    strcpy(path + len, name);
+                pid = fork();
+                // --- child
+                if (pid == 0) {
+                    if (path[len-1] != '/') {
+                        path[len] = '/';
+                        strcpy(path + len + 1, name);
+                    } else {
+                        strcpy(path + len, name);
+                    }
+                    listdir(path, print_location, info);
+                    return;
                 }
-                listdir(path, print_location, info);
-                path[len] = '\0';
             }
         }
         // ---- directory is a file
@@ -194,6 +199,9 @@ void listdir(char* path, FILE* print_location, file_info* info) {
             print_fileinfo(print_location, info);
             path[len] = '\0';
         }
+    }
+    if (pid != 0) {
+        wait(NULL);
     }
     closedir(dir);
 }
@@ -317,6 +325,10 @@ int main(int argc, char *argv[]) {
         // ---- looping through every file
         listdir(command->directory, print_location, info);
     }
+
+    // ---- freeing memory after work is done
+    free(info);
+    free(command);
 
     exit(EXIT_SUCCESS); 
 }

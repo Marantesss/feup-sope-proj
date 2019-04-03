@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/timeb.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <dirent.h>
 
@@ -30,7 +31,7 @@
 #define MAX_FILE_NAME       64
 #define ACCESS_PERMISSIONS  3
 
-#define PID_NUMBER 9
+#define PID_NUMBER 8
 
 typedef struct {
     char file_name[MAX_FILE_NAME+1];              /**< @brief  */
@@ -44,6 +45,8 @@ typedef struct {
     char md5_hash[MD5_HASH_SIZE+1];
     char sha1_hash[SHA1_HASH_SIZE+1];
     char sha256_hash[SHA256_HASH_SIZE+1];
+
+    char process_id[PID_NUMBER+1];
 } file_info;
 
 typedef struct {
