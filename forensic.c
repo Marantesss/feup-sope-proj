@@ -198,6 +198,12 @@ void listdir(char* path, FILE* print_location, file_info* info) {
     closedir(dir);
 }
 
+int is_regular_file(const char *path) {
+    struct stat path_stat;
+    stat(path, &path_stat);
+    return S_ISREG(path_stat.st_mode);
+}
+
 int main(int argc, char *argv[]) {
     struct stat st;
     FILE * print_location;
@@ -295,13 +301,22 @@ int main(int argc, char *argv[]) {
     strcpy(command->directory, argv[argc-1]);
 
     // ---- making sure directory exists
-    if( access(command->directory, F_OK ) == -1 ) {
+    if(access(command->directory, F_OK) == -1) {
         printf("%s: no such file or directory\n", command->directory);
         exit(EXIT_FAILURE);
     }
 
-    // ---- looping through every file
-    listdir(command->directory, print_location, info);
+    // ---- checking if directory is a file or a directory
+    if (is_regular_file(command->directory)) {
+        // ---- getting information from directory
+        dump_stat(command->directory, info);
+        // ---- printing the info from directory
+        print_fileinfo(print_location, info);
+    }
+    else {
+        // ---- looping through every file
+        listdir(command->directory, print_location, info);
+    }
 
     exit(EXIT_SUCCESS); 
 }
