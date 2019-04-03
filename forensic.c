@@ -63,10 +63,12 @@ void dump_stat(char* path, file_info *info) {
     
     pclose(f1);
 
-    strcpy(info->file_name, strtok(o_command_file, ": "));
+    strcpy(info->file_name, strtok(o_command_file, " "));
+    info->file_name[strlen(info->file_name) - 1] = NULL;
     // ----
     
     // ---- getting file type
+    //strtok(NULL, " ");
     strcpy(info->file_type, strtok(NULL, "\n"));
     // ----
 
@@ -200,9 +202,9 @@ void listdir(char* path, FILE* print_location, file_info* info) {
             path[len] = '\0';
         }
     }
-    if (pid != 0) {
-        wait(NULL);
-    }
+    
+    while (wait(NULL) != -1 && errno != ECHILD) {}
+
     closedir(dir);
 }
 
