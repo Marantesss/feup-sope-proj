@@ -213,7 +213,6 @@ int is_regular_file(const char *path) {
 }
 
 int main(int argc, char *argv[]) {
-    struct stat st;
     FILE * print_location;
 
     // ---- allocating memory for command_info and file_info
