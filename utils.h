@@ -11,6 +11,9 @@
 #include <signal.h>
 #include <errno.h>
 
+// ---- type of act to write in logfile
+typedef enum {COMMAND, SIGNAL, ANALIZED} act_type; 
+
 // ---- Command flags
 #define FLAG_NUMBER     4
 
