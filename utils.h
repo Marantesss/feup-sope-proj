@@ -11,9 +11,6 @@
 #include <signal.h>
 #include <errno.h>
 
-// ---- type of act to write in logfile
-typedef enum {COMMAND, SIGNAL, ANALIZED} act_type; 
-
 // ---- Command flags
 #define FLAG_NUMBER     4
 
@@ -38,6 +35,9 @@ typedef enum {COMMAND, SIGNAL, ANALIZED} act_type;
 
 #define PID_NUMBER 8
 
+// ---- type of act to write in logfile
+typedef enum {COMMAND, SIGNAL, ANALIZED} act_type; 
+
 typedef struct {
     char file_name[MAX_FILE_NAME+1];              /**< @brief  */
     char file_type[MAX_FILE_NAME+1];              /**< @brief  */
@@ -55,6 +55,7 @@ typedef struct {
 } file_info;
 
 typedef struct {
+    char exec_name[MAX_FILE_NAME+1];
     char directory[MAX_FILE_NAME+1];
     char outfile[MAX_FILE_NAME+1];
     char cryptohash[MAX_FILE_NAME+1];

@@ -13,11 +13,12 @@ void sig_dirs_handler(int dirs){
     dirs++;
     printf("New directory: %d/%d directories/files at this time.\n", dirs, files);
 }
+
 //------
 //so chamar esta função quando tiver ativa a flag -v
-void write_log(struct timespec tstart, act_type act){
+void write_log(struct timespec tstart, act_type act, char *exec_parameters){
     struct timespec tend;
-    char *act_to_log;
+    char act_to_log[MAX_FILE_NAME+1] = "";
     double diff;
     pid_t pid = getpid();
     FILE *logfilep = fopen(command->logfilename, "a+"); // a+ (create + append) option will allow appending which is useful in a log file
@@ -29,36 +30,24 @@ void write_log(struct timespec tstart, act_type act){
     //o que se segue escrito na string act_to_log sao exemplos, é como deve ficar
     switch (act){
         case COMMAND:
-        act_to_log = "COMMAND forensic -r ./folder";
         //------
-        //concatenar o nome do comando ex, "forensic", "./a.out"
-        //------
-        //verificar as flags e concatena-las
-        //------
-        //------
-        //verifica o output flag e o nome        
-        if(command->raised_flags[OUTFILE]){
-            strcat(act_to_log, " -o");
-            strcat(act_to_log, " ");
-            strcat(act_to_log, command->outfile);
-        }
-        //------
-        //aqui é suposto ter o nome do ficheiro/diretorio a verificar
-        //strcat(act_to_log, file_info->file_name);
+        //commando e os seus parametros
+        strcat(act_to_log, "COMMAND ");
+        strcat(act_to_log, exec_parameters);
             break;
         case SIGNAL:
-        act_to_log = "SIGNAL USR1";
+        strcat(act_to_log, "SIGNAL ");
+        //act_to_log = "SIGNAL USR1";
         //------
         //quando se usa um sinal
         //sacar o sinal e concatenar na string
             break;
         case ANALIZED:
-        act_to_log = "ANALIZED 1.txt";
         //------
-        //quando se acaba de verificar um ficheiro
-        //sacar o nome do ficheiro e concatenar na string
+        //nome do ficheiro/diretorio analisado
+        strcat(act_to_log, "ANALIZED ");
+        strcat(act_to_log, command->directory);
             break;    
-    
         default:
         //erro
         exit(EXIT_FAILURE);
@@ -68,7 +57,7 @@ void write_log(struct timespec tstart, act_type act){
     clock_gettime(CLOCK_MONOTONIC, &tend);
     diff = (double) (1000.00*(tend.tv_sec - tstart.tv_sec) + 1.0e-9*(tend.tv_nsec - tstart.tv_nsec));
     fprintf(logfilep, "%.2lf - %08ld - %s\n", diff, (long) pid, act_to_log);
-
+    
     fclose(logfilep);
 
     printf("Log successfully written!\n");
@@ -226,7 +215,7 @@ void dump_stat(char* path, file_info *info) {
     // ----
 }
 
-void listdir(char* path, FILE* print_location, file_info* info) {
+void listdir(char* path, FILE* print_location, file_info* info, struct timespec tstart) {
     DIR *dir;
     struct dirent *entry;
     size_t len = strlen(path);
@@ -258,7 +247,7 @@ void listdir(char* path, FILE* print_location, file_info* info) {
                     } else {
                         strcpy(path + len, name);
                     }
-                    listdir(path, print_location, info);
+                    listdir(path, print_location, info, tstart);
                     return;
                 }
             }
@@ -274,6 +263,8 @@ void listdir(char* path, FILE* print_location, file_info* info) {
             }
             // ---- getting information from directory
             dump_stat(path, info);
+            if (command->raised_flags[LOGFILE])
+                write_log(tstart, ANALIZED, "");
             // ---- printing the info from directory
             print_fileinfo(print_location, info);
             path[len] = '\0';
@@ -297,6 +288,7 @@ int main(int argc, char *argv[]) {
     signal(SIGUSR1, sig_dirs_handler);
     signal(SIGUSR2, sig_files_handler);
     FILE * print_location;
+    char exec_parameters[MAX_FILE_NAME+1] = "";
 
     // ---- allocating memory for command_info and file_info
     file_info *info = calloc(1, sizeof(file_info));
@@ -318,6 +310,16 @@ int main(int argc, char *argv[]) {
     if (!strcmp(argv[1], "--help")) {
         printf("Usage: %s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
         exit(EXIT_SUCCESS);
+    }
+
+    // ---- saving exec name
+    strcpy(command->exec_name, argv[0]);
+
+    // ----
+    //useful to write the command in the log file, act part
+    for(int i = 0; i < argc; i++){
+        strcat(exec_parameters, argv[i]);
+        strcat(exec_parameters, " ");
     }
 
     // ---- parsing command flags
@@ -348,7 +350,8 @@ int main(int argc, char *argv[]) {
         // --- -v flag
         } else if (!strcmp(argv[i], "-v")) {
             command->raised_flags[LOGFILE] = 1;
-            //write_log(tstart, COMMAND);
+            strcpy(command->logfilename, getenv("LOGFILENAME"));
+            write_log(tstart, COMMAND, exec_parameters);
             if (!(strcmp(argv[i], "-h") && strcmp(argv[i], "-o") && strcmp(argv[i], "-r"))) {
                 printf("Option %s needs a value\n", argv[i-1]);
                 printf("Usage:\n%s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
@@ -401,12 +404,14 @@ int main(int argc, char *argv[]) {
     if (is_regular_file(command->directory)) {
         // ---- getting information from directory
         dump_stat(command->directory, info);
+        if (command->raised_flags[LOGFILE])
+            write_log(tstart, ANALIZED, "");
         // ---- printing the info from directory
         print_fileinfo(print_location, info);
     }
     else {
         // ---- looping through every file
-        listdir(command->directory, print_location, info);
+        listdir(command->directory, print_location, info, tstart);
     }
 
     // ---- freeing memory after work is done
