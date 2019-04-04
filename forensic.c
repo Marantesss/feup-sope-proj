@@ -75,10 +75,12 @@ void dump_stat(char* path, file_info *info) {
     
     pclose(f1);
 
-    strcpy(info->file_name, strtok(o_command_file, ": "));
+    strcpy(info->file_name, strtok(o_command_file, " "));
+    info->file_name[strlen(info->file_name) - 1] = NULL;
     // ----
     
     // ---- getting file type
+    //strtok(NULL, " ");
     strcpy(info->file_type, strtok(NULL, "\n"));
     // ----
 
@@ -171,6 +173,7 @@ void listdir(char* path, FILE* print_location, file_info* info) {
     //struct stat path_stat;
     //stat(path, &path_stat);
     //S_ISREG(path_stat.st_mode); //verifica se o path é file ou dir ou outra cena, might be helpful
+    pid_t pid;
 
     if (!(dir = opendir(path))) {
         perror("in listdir() - path");
@@ -186,14 +189,18 @@ void listdir(char* path, FILE* print_location, file_info* info) {
             if (!strcmp(name, ".") || !strcmp(name, ".."))
                 continue;
             else if (command->raised_flags[RECURSIVE]) {
-                if (path[len-1] != '/') {
-                    path[len] = '/';
-                    strcpy(path + len + 1, name);
-                } else {
-                    strcpy(path + len, name);
+                pid = fork();
+                // --- child
+                if (pid == 0) {
+                    if (path[len-1] != '/') {
+                        path[len] = '/';
+                        strcpy(path + len + 1, name);
+                    } else {
+                        strcpy(path + len, name);
+                    }
+                    listdir(path, print_location, info);
+                    return;
                 }
-                listdir(path, print_location, info);
-                path[len] = '\0';
             }
         }
         // ---- directory is a file
@@ -212,7 +219,16 @@ void listdir(char* path, FILE* print_location, file_info* info) {
             path[len] = '\0';
         }
     }
+    
+    while (wait(NULL) != -1 && errno != ECHILD) {}
+
     closedir(dir);
+}
+
+int is_regular_file(const char *path) {
+    struct stat path_stat;
+    stat(path, &path_stat);
+    return S_ISREG(path_stat.st_mode);
 }
 
 int main(int argc, char *argv[]) {
@@ -314,13 +330,26 @@ int main(int argc, char *argv[]) {
     strcpy(command->directory, argv[argc-1]);
 
     // ---- making sure directory exists
-    if( access(command->directory, F_OK ) == -1 ) {
+    if(access(command->directory, F_OK) == -1) {
         printf("%s: no such file or directory\n", command->directory);
         exit(EXIT_FAILURE);
     }
 
-    // ---- looping through every file
-    listdir(command->directory, print_location, info);
+    // ---- checking if directory is a file or a directory
+    if (is_regular_file(command->directory)) {
+        // ---- getting information from directory
+        dump_stat(command->directory, info);
+        // ---- printing the info from directory
+        print_fileinfo(print_location, info);
+    }
+    else {
+        // ---- looping through every file
+        listdir(command->directory, print_location, info);
+    }
+
+    // ---- freeing memory after work is done
+    free(info);
+    free(command);
 
     exit(EXIT_SUCCESS); 
 }
