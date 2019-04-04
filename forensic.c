@@ -136,13 +136,12 @@ void dump_stat(char* path, file_info *info) {
     
     pclose(f1);
 
-    strcpy(info->file_name, strtok(o_command_file, " "));
-    info->file_name[strlen(info->file_name) - 1] = '\0';
+    strcpy(info->file_name, strtok(o_command_file, ":"));
     // ----
     
     // ---- getting file type
-    //strtok(NULL, " ");
     strcpy(info->file_type, strtok(NULL, "\n"));
+    memmove(info->file_type, info->file_type + 1, strlen(info->file_type));
     // ----
 
     // ---- getting size
