@@ -25,7 +25,11 @@ void write_log(struct timespec tstart, act_type act, char *exec_parameters){
 
     if (logfilep == NULL)
         exit(EXIT_FAILURE);
-
+    
+    if(!getenv("LOGFILENAME")){
+        printf("Variavel \"LOGFILENAME\" nao esta definida!\n");
+        exit(EXIT_FAILURE);
+    }
     //------
     //o que se segue escrito na string act_to_log sao exemplos, é como deve ficar
     switch (act){
