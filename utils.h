@@ -10,6 +10,7 @@
 #include <dirent.h>
 #include <signal.h>
 #include <errno.h>
+#include <sys/mman.h>
 
 // ---- Command flags
 #define FLAG_NUMBER     4

@@ -1,20 +1,36 @@
 #include "utils.h"
 
 command_info *command = NULL; /**< @brief Struct containing command information*/
+volatile int exit_program = 0;
 
-int dirs = 0;
-int files = 0;
+static int *dirs = 0;
+static int *files = 0;
 
-void sig_files_handler(int files){
-    files++;
+void sigint_handler(int signo) {
+    if (signo == SIGTERM)
+        exit_program = 1;
 }
 
-void sig_dirs_handler(int dirs){
-    dirs++;
-    printf("New directory: %d/%d directories/files at this time.\n", dirs, files);
+void sig_files_handler(){
+    (*files)++;
 }
 
-//------
+void sig_dirs_handler(){
+    (*dirs)++;
+    printf("New directory: %d/%d directories/files at this time.\n", *dirs, *files);
+}
+
+void sigusr_handler(int signo) {
+    if (signo == SIGUSR1) {
+        sig_dirs_handler();
+    }
+
+    else if (signo == SIGUSR2) {
+        sig_files_handler();
+    }
+}
+
+//------kill(pid, SIGINT);
 //so chamar esta função quando tiver ativa a flag -v
 void write_log(struct timespec tstart, act_type act, char *exec_parameters){
     struct timespec tend;
@@ -103,6 +119,11 @@ void print_fileinfo(FILE* print_location, file_info* info) {
         fwrite(info->sha256_hash, sizeof(char), strlen(info->sha256_hash), print_location);
     }
     fwrite("\n", sizeof(char), strlen("\n"), print_location);
+
+    // ---- check if ctrl+c was pressed
+    if (exit_program) {
+        exit(EXIT_FAILURE);
+    }
 }
 
 void dump_stat(char* path, file_info *info) {
@@ -238,7 +259,8 @@ void listdir(char* path, FILE* print_location, file_info* info, struct timespec 
         char *name = entry->d_name;
         // ---- directory is a folder and -r flag is turned on
         if (entry->d_type == DT_DIR) {
-            //kill(getpid(), SIGUSR1);
+            if (command->raised_flags[OUTFILE])
+                kill(getpid(), SIGUSR1);
             if (!strcmp(name, ".") || !strcmp(name, ".."))
                 continue;
             else if (command->raised_flags[RECURSIVE]) {
@@ -258,7 +280,8 @@ void listdir(char* path, FILE* print_location, file_info* info, struct timespec 
         }
         // ---- directory is a file
         else {
-            //kill(getpid(), SIGUSR2);
+            if (command->raised_flags[OUTFILE])
+                kill(getpid(), SIGUSR2);
             if (path[len-1] != '/') {
                 path[len] = '/';
                 strcpy(path + len + 1, name);
@@ -287,6 +310,11 @@ int is_regular_file(const char *path) {
 }
 
 int main(int argc, char *argv[]) {
+    signal(SIGINT, sigint_handler);
+
+    files = mmap (NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, (int)-1, 0);
+    dirs = mmap (NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, (int)-1, 0);
+
     struct timespec tstart;
     clock_gettime(CLOCK_MONOTONIC, &tstart); 
     signal(SIGUSR1, sig_dirs_handler);
@@ -351,8 +379,6 @@ int main(int argc, char *argv[]) {
         // --- -v flag
         } else if (!strcmp(argv[i], "-v")) {
             command->raised_flags[LOGFILE] = 1;
-            strcpy(command->logfilename, getenv("LOGFILENAME"));
-            write_log(tstart, COMMAND, exec_parameters);
             if (!(strcmp(argv[i], "-h") && strcmp(argv[i], "-o") && strcmp(argv[i], "-r"))) {
                 printf("Option %s needs a value\n", argv[i-1]);
                 printf("Usage:\n%s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
@@ -365,11 +391,26 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // ---- getting LOGFILENAME
+    if (command->raised_flags[LOGFILE]) {
+        if (getenv("LOGFILENAME") != NULL) {
+            strcpy(command->logfilename, getenv("LOGFILENAME"));
+            write_log(tstart, COMMAND, exec_parameters);
+        }
+        else {
+            printf("Environment variable LOGFILENAME not found\n");
+            printf("Use: export LOGFILENAME=<name>\n");
+        }
+    }
+
     // ---- getting output location
     // "w" flag creates a file if it does not already exist
     // w --> O_WRONLY | O_CREAT | O_TRUNC
-    if (command->raised_flags[OUTFILE])
+    if (command->raised_flags[OUTFILE]) {
+        signal(SIGUSR1, sigusr_handler);
+        signal(SIGUSR2, sigusr_handler);
         print_location = fopen(command->outfile, "w");
+    }
     else
         print_location = stdout;
 
@@ -418,6 +459,9 @@ int main(int argc, char *argv[]) {
     // ---- freeing memory after work is done
     free(info);
     free(command);
+
+    munmap(files, sizeof *files);
+    munmap(dirs, sizeof *dirs);
 
     exit(EXIT_SUCCESS); 
 }

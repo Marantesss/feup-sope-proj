@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Werror -pedantic
+CFLAGS=-Wall -Wextra -Werror -pedantic
 TARGET=forensic
 SRCS=forensic.c
 
@@ -14,10 +14,10 @@ all: $(TARGET)
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@
 
-# forensic.o: forensic.c utils.h
+forensic.o: forensic.c utils.h
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -MMD -c $< -o $@
 
 clean:
-	rm -f $(TARGET) *.o
+	rm -f $(TARGET) *.o *.d
