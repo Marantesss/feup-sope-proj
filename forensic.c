@@ -2,20 +2,20 @@
 
 command_info *command = NULL; /**< @brief Struct containing command information*/
 
-int dirs = 0;
-int files = 0;
+static int *dirs = 0;
+static int *files = 0;
 
 void sigint_handler(int signo) {
     exit(1);
 }
 
 void sig_files_handler(){
-    files++;
+    (*files)++;
 }
 
 void sig_dirs_handler(){
-    dirs++;
-    printf("New directory: %d/%d directories/files at this time.\n", dirs, files);
+    (*dirs)++;
+    printf("New directory: %d/%d directories/files at this time.\n", *dirs, *files);
 }
 
 void sigusr_handler(int signo) {
@@ -305,6 +305,9 @@ int is_regular_file(const char *path) {
 int main(int argc, char *argv[]) {
     signal(SIGINT, sigint_handler);
 
+    files = mmap (NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, (int)-1, 0);
+    dirs = mmap (NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, (int)-1, 0);
+
     struct timespec tstart;
     clock_gettime(CLOCK_MONOTONIC, &tstart); 
     signal(SIGUSR1, sig_dirs_handler);
@@ -385,7 +388,7 @@ int main(int argc, char *argv[]) {
     }
 
     // ---- getting LOGFILENAME
-    if (command->raised_flags[LOGFILE])
+    if (command->raised_flags[LOGFILE]) {
         if (getenv("LOGFILENAME") != NULL) {
             strcpy(command->logfilename, getenv("LOGFILENAME"));
             write_log(tstart, COMMAND, exec_parameters);
@@ -394,6 +397,7 @@ int main(int argc, char *argv[]) {
             printf("Environment variable LOGFILENAME not found\n");
             printf("Use: export LOGFILENAME=<name>\n");
         }
+    }
 
     // ---- getting output location
     // "w" flag creates a file if it does not already exist
@@ -451,6 +455,9 @@ int main(int argc, char *argv[]) {
     // ---- freeing memory after work is done
     free(info);
     free(command);
+
+    munmap(files, sizeof *files);
+    munmap(dirs, sizeof *dirs);
 
     exit(EXIT_SUCCESS); 
 }
