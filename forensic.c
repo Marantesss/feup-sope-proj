@@ -64,7 +64,7 @@ void dump_stat(char* path, file_info *info) {
     pclose(f1);
 
     strcpy(info->file_name, strtok(o_command_file, " "));
-    info->file_name[strlen(info->file_name) - 1] = NULL;
+    info->file_name[strlen(info->file_name) - 1] = '\0';
     // ----
     
     // ---- getting file type
