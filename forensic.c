@@ -5,16 +5,30 @@ command_info *command = NULL; /**< @brief Struct containing command information*
 int dirs = 0;
 int files = 0;
 
-void sig_files_handler(int files){
+void sigint_handler(int signo) {
+    exit(1);
+}
+
+void sig_files_handler(){
     files++;
 }
 
-void sig_dirs_handler(int dirs){
+void sig_dirs_handler(){
     dirs++;
     printf("New directory: %d/%d directories/files at this time.\n", dirs, files);
 }
 
-//------
+void sigusr_handler(int signo) {
+    if (signo == SIGUSR1) {
+        sig_dirs_handler();
+    }
+
+    else if (signo == SIGUSR2) {
+        sig_files_handler();
+    }
+}
+
+//------kill(pid, SIGINT);
 //so chamar esta função quando tiver ativa a flag -v
 void write_log(struct timespec tstart, act_type act, char *exec_parameters){
     struct timespec tend;
@@ -238,7 +252,8 @@ void listdir(char* path, FILE* print_location, file_info* info, struct timespec 
         char *name = entry->d_name;
         // ---- directory is a folder and -r flag is turned on
         if (entry->d_type == DT_DIR) {
-            //kill(getpid(), SIGUSR1);
+            if (command->raised_flags[OUTFILE])
+                kill(getpid(), SIGUSR1);
             if (!strcmp(name, ".") || !strcmp(name, ".."))
                 continue;
             else if (command->raised_flags[RECURSIVE]) {
@@ -258,7 +273,8 @@ void listdir(char* path, FILE* print_location, file_info* info, struct timespec 
         }
         // ---- directory is a file
         else {
-            //kill(getpid(), SIGUSR2);
+            if (command->raised_flags[OUTFILE])
+                kill(getpid(), SIGUSR2);
             if (path[len-1] != '/') {
                 path[len] = '/';
                 strcpy(path + len + 1, name);
@@ -287,6 +303,8 @@ int is_regular_file(const char *path) {
 }
 
 int main(int argc, char *argv[]) {
+    signal(SIGINT, sigint_handler);
+
     struct timespec tstart;
     clock_gettime(CLOCK_MONOTONIC, &tstart); 
     signal(SIGUSR1, sig_dirs_handler);
@@ -371,8 +389,11 @@ int main(int argc, char *argv[]) {
     // ---- getting output location
     // "w" flag creates a file if it does not already exist
     // w --> O_WRONLY | O_CREAT | O_TRUNC
-    if (command->raised_flags[OUTFILE])
+    if (command->raised_flags[OUTFILE]) {
+        signal(SIGUSR1, sigusr_handler);
+        signal(SIGUSR2, sigusr_handler);
         print_location = fopen(command->outfile, "w");
+    }
     else
         print_location = stdout;
 
