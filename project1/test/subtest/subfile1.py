@@ -1,0 +1,1 @@
+print("You're a curious one, aren't you?")
