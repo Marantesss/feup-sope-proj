@@ -1,12 +1,14 @@
 #include "utils.h"
 
 command_info *command = NULL; /**< @brief Struct containing command information*/
+volatile int exit_program = 0;
 
 int dirs = 0;
 int files = 0;
 
 void sigint_handler(int signo) {
-    exit(1);
+    if (signo == SIGTERM)
+        exit_program = 1;
 }
 
 void sig_files_handler(){
@@ -117,6 +119,11 @@ void print_fileinfo(FILE* print_location, file_info* info) {
         fwrite(info->sha256_hash, sizeof(char), strlen(info->sha256_hash), print_location);
     }
     fwrite("\n", sizeof(char), strlen("\n"), print_location);
+
+    // ---- check if ctrl+c was pressed
+    if (exit_program) {
+        exit(EXIT_FAILURE);
+    }
 }
 
 void dump_stat(char* path, file_info *info) {
@@ -385,7 +392,7 @@ int main(int argc, char *argv[]) {
     }
 
     // ---- getting LOGFILENAME
-    if (command->raised_flags[LOGFILE])
+    if (command->raised_flags[LOGFILE]) {
         if (getenv("LOGFILENAME") != NULL) {
             strcpy(command->logfilename, getenv("LOGFILENAME"));
             write_log(tstart, COMMAND, exec_parameters);
@@ -394,6 +401,7 @@ int main(int argc, char *argv[]) {
             printf("Environment variable LOGFILENAME not found\n");
             printf("Use: export LOGFILENAME=<name>\n");
         }
+    }
 
     // ---- getting output location
     // "w" flag creates a file if it does not already exist
