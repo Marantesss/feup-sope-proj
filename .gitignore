@@ -7,3 +7,6 @@
 
 #ignore all text files
 *.txt
+
+#ignore forensic executable from makefile
+forensic

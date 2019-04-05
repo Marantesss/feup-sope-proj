@@ -7,6 +7,11 @@
 
 int main(int argc, char *argv[], char *envp[]){
 
+    if(!getenv("LOGFILENAME"))
+        printf("nao existe boy\n");
+
+    return 0;
+
     //char inst[MAX_FILE_NAME], pid[PID_NUMBER], act[MAX_FILE_NAME];
     struct timespec tstart, tend;  
     //struct timeb start, end;  
@@ -41,6 +46,8 @@ int main(int argc, char *argv[], char *envp[]){
 
     if (f == NULL)
         return 1;
+
+    fclose(f);
 
     return 0;
 }

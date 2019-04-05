@@ -2,6 +2,86 @@
 
 command_info *command = NULL; /**< @brief Struct containing command information*/
 
+int dirs = 0;
+int files = 0;
+
+void sigint_handler(int signo) {
+    exit(1);
+}
+
+void sig_files_handler(){
+    files++;
+}
+
+void sig_dirs_handler(){
+    dirs++;
+    printf("New directory: %d/%d directories/files at this time.\n", dirs, files);
+}
+
+void sigusr_handler(int signo) {
+    if (signo == SIGUSR1) {
+        sig_dirs_handler();
+    }
+
+    else if (signo == SIGUSR2) {
+        sig_files_handler();
+    }
+}
+
+//------kill(pid, SIGINT);
+//so chamar esta função quando tiver ativa a flag -v
+void write_log(struct timespec tstart, act_type act, char *exec_parameters){
+    struct timespec tend;
+    char act_to_log[MAX_FILE_NAME+1] = "";
+    double diff;
+    pid_t pid = getpid();
+    FILE *logfilep = fopen(command->logfilename, "a+"); // a+ (create + append) option will allow appending which is useful in a log file
+
+    if (logfilep == NULL)
+        exit(EXIT_FAILURE);
+    
+    if(!getenv("LOGFILENAME")){
+        printf("Variavel \"LOGFILENAME\" nao esta definida!\n");
+        exit(EXIT_FAILURE);
+    }
+    //------
+    //o que se segue escrito na string act_to_log sao exemplos, é como deve ficar
+    switch (act){
+        case COMMAND:
+        //------
+        //commando e os seus parametros
+        strcat(act_to_log, "COMMAND ");
+        strcat(act_to_log, exec_parameters);
+            break;
+        case SIGNAL:
+        strcat(act_to_log, "SIGNAL ");
+        //act_to_log = "SIGNAL USR1";
+        //------
+        //quando se usa um sinal
+        //sacar o sinal e concatenar na string
+            break;
+        case ANALIZED:
+        //------
+        //nome do ficheiro/diretorio analisado
+        strcat(act_to_log, "ANALIZED ");
+        strcat(act_to_log, command->directory);
+            break;    
+        default:
+        //erro
+        exit(EXIT_FAILURE);
+            break;
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &tend);
+    diff = (double) (1000.00*(tend.tv_sec - tstart.tv_sec) + 1.0e-9*(tend.tv_nsec - tstart.tv_nsec));
+    fprintf(logfilep, "%.2lf - %08ld - %s\n", diff, (long) pid, act_to_log);
+    
+    fclose(logfilep);
+
+    printf("Log successfully written!\n");
+
+}
+
 void print_fileinfo(FILE* print_location, file_info* info) {
     // ---- file name
     fwrite(info->file_name, sizeof(char), strlen(info->file_name), print_location);
@@ -63,13 +143,12 @@ void dump_stat(char* path, file_info *info) {
     
     pclose(f1);
 
-    strcpy(info->file_name, strtok(o_command_file, " "));
-    info->file_name[strlen(info->file_name) - 1] = '\0';
+    strcpy(info->file_name, strtok(o_command_file, ":"));
     // ----
     
     // ---- getting file type
-    //strtok(NULL, " ");
     strcpy(info->file_type, strtok(NULL, "\n"));
+    memmove(info->file_type, info->file_type + 1, strlen(info->file_type));
     // ----
 
     // ---- getting size
@@ -154,10 +233,13 @@ void dump_stat(char* path, file_info *info) {
     // ----
 }
 
-void listdir(char* path, FILE* print_location, file_info* info) {
+void listdir(char* path, FILE* print_location, file_info* info, struct timespec tstart) {
     DIR *dir;
     struct dirent *entry;
     size_t len = strlen(path);
+    //struct stat path_stat;
+    //stat(path, &path_stat);
+    //S_ISREG(path_stat.st_mode); //verifica se o path é file ou dir ou outra cena, might be helpful
     pid_t pid;
 
     if (!(dir = opendir(path))) {
@@ -170,6 +252,8 @@ void listdir(char* path, FILE* print_location, file_info* info) {
         char *name = entry->d_name;
         // ---- directory is a folder and -r flag is turned on
         if (entry->d_type == DT_DIR) {
+            if (command->raised_flags[OUTFILE])
+                kill(getpid(), SIGUSR1);
             if (!strcmp(name, ".") || !strcmp(name, ".."))
                 continue;
             else if (command->raised_flags[RECURSIVE]) {
@@ -182,13 +266,15 @@ void listdir(char* path, FILE* print_location, file_info* info) {
                     } else {
                         strcpy(path + len, name);
                     }
-                    listdir(path, print_location, info);
+                    listdir(path, print_location, info, tstart);
                     return;
                 }
             }
         }
         // ---- directory is a file
         else {
+            if (command->raised_flags[OUTFILE])
+                kill(getpid(), SIGUSR2);
             if (path[len-1] != '/') {
                 path[len] = '/';
                 strcpy(path + len + 1, name);
@@ -197,6 +283,8 @@ void listdir(char* path, FILE* print_location, file_info* info) {
             }
             // ---- getting information from directory
             dump_stat(path, info);
+            if (command->raised_flags[LOGFILE])
+                write_log(tstart, ANALIZED, "");
             // ---- printing the info from directory
             print_fileinfo(print_location, info);
             path[len] = '\0';
@@ -215,7 +303,14 @@ int is_regular_file(const char *path) {
 }
 
 int main(int argc, char *argv[]) {
+    signal(SIGINT, sigint_handler);
+
+    struct timespec tstart;
+    clock_gettime(CLOCK_MONOTONIC, &tstart); 
+    signal(SIGUSR1, sig_dirs_handler);
+    signal(SIGUSR2, sig_files_handler);
     FILE * print_location;
+    char exec_parameters[MAX_FILE_NAME+1] = "";
 
     // ---- allocating memory for command_info and file_info
     file_info *info = calloc(1, sizeof(file_info));
@@ -237,6 +332,16 @@ int main(int argc, char *argv[]) {
     if (!strcmp(argv[1], "--help")) {
         printf("Usage: %s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
         exit(EXIT_SUCCESS);
+    }
+
+    // ---- saving exec name
+    strcpy(command->exec_name, argv[0]);
+
+    // ----
+    //useful to write the command in the log file, act part
+    for(int i = 0; i < argc; i++){
+        strcat(exec_parameters, argv[i]);
+        strcat(exec_parameters, " ");
     }
 
     // ---- parsing command flags
@@ -279,11 +384,25 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // ---- getting LOGFILENAME
+    if (command->raised_flags[LOGFILE])
+        if (getenv("LOGFILENAME") != NULL) {
+            strcpy(command->logfilename, getenv("LOGFILENAME"));
+            write_log(tstart, COMMAND, exec_parameters);
+        }
+        else {
+            printf("Environment variable LOGFILENAME not found\n");
+            printf("Use: export LOGFILENAME=<name>\n");
+        }
+
     // ---- getting output location
     // "w" flag creates a file if it does not already exist
     // w --> O_WRONLY | O_CREAT | O_TRUNC
-    if (command->raised_flags[OUTFILE])
+    if (command->raised_flags[OUTFILE]) {
+        signal(SIGUSR1, sigusr_handler);
+        signal(SIGUSR2, sigusr_handler);
         print_location = fopen(command->outfile, "w");
+    }
     else
         print_location = stdout;
 
@@ -319,12 +438,14 @@ int main(int argc, char *argv[]) {
     if (is_regular_file(command->directory)) {
         // ---- getting information from directory
         dump_stat(command->directory, info);
+        if (command->raised_flags[LOGFILE])
+            write_log(tstart, ANALIZED, "");
         // ---- printing the info from directory
         print_fileinfo(print_location, info);
     }
     else {
         // ---- looping through every file
-        listdir(command->directory, print_location, info);
+        listdir(command->directory, print_location, info, tstart);
     }
 
     // ---- freeing memory after work is done
