@@ -3,30 +3,27 @@
 command_info *command = NULL; /**< @brief Struct containing command information*/
 volatile int exit_program = 0;
 
-static int *dirs = 0;
-static int *files = 0;
-
 void sigint_handler(int signo) {
-    if (signo == SIGTERM)
+    if (signo == SIGINT)
         exit_program = 1;
 }
 
-void sig_files_handler(){
-    (*files)++;
-}
+void signal_handler(int signo) {
+    static int files = 0;
+    static int dirs = 0;
 
-void sig_dirs_handler(){
-    (*dirs)++;
-    printf("New directory: %d/%d directories/files at this time.\n", *dirs, *files);
-}
-
-void sigusr_handler(int signo) {
-    if (signo == SIGUSR1) {
-        sig_dirs_handler();
-    }
-
-    else if (signo == SIGUSR2) {
-        sig_files_handler();
+    switch (signo) {
+        case SIGINT:
+            exit_program = 1;
+            break;
+        case SIGUSR2:
+            files++;
+            printf("New file\n");
+            break;
+        case SIGUSR1:
+            dirs++;
+            printf("New directory: %d/%d directories/files at this time.\n", dirs, files);
+            break;
     }
 }
 
@@ -260,7 +257,7 @@ void listdir(char* path, FILE* print_location, file_info* info, struct timespec 
         // ---- directory is a folder and -r flag is turned on
         if (entry->d_type == DT_DIR) {
             if (command->raised_flags[OUTFILE])
-                kill(getpid(), SIGUSR1);
+                kill(command->parentPID, SIGUSR1);
             if (!strcmp(name, ".") || !strcmp(name, ".."))
                 continue;
             else if (command->raised_flags[RECURSIVE]) {
@@ -281,7 +278,7 @@ void listdir(char* path, FILE* print_location, file_info* info, struct timespec 
         // ---- directory is a file
         else {
             if (command->raised_flags[OUTFILE])
-                kill(getpid(), SIGUSR2);
+                kill(command->parentPID, SIGUSR2);
             if (path[len-1] != '/') {
                 path[len] = '/';
                 strcpy(path + len + 1, name);
@@ -310,17 +307,27 @@ int is_regular_file(const char *path) {
 }
 
 int main(int argc, char *argv[]) {
-    signal(SIGINT, sigint_handler);
-
-    files = mmap (NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, (int)-1, 0);
-    dirs = mmap (NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, (int)-1, 0);
 
     struct timespec tstart;
-    clock_gettime(CLOCK_MONOTONIC, &tstart); 
-    signal(SIGUSR1, sig_dirs_handler);
-    signal(SIGUSR2, sig_files_handler);
+    clock_gettime(CLOCK_MONOTONIC, &tstart);
     FILE * print_location;
     char exec_parameters[MAX_FILE_NAME+1] = "";
+
+    // ---- installing handlers
+    if (signal(SIGINT, signal_handler) == SIG_ERR) {
+        fprintf(stderr,"Unable to install SIGINT handler\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (signal(SIGUSR1, signal_handler) == SIG_ERR) {
+        fprintf(stderr,"Unable to install SIGUSR1 handler\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (signal(SIGUSR2, signal_handler) == SIG_ERR) {
+        fprintf(stderr,"Unable to install SIGUSR2 handler\n");
+        exit(EXIT_FAILURE);
+    }
 
     // ---- allocating memory for command_info and file_info
     file_info *info = calloc(1, sizeof(file_info));
@@ -394,6 +401,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // ---- getting parent process ID
+    command->parentPID = getpid();
+    printf("%d\n", command->parentPID);
+
     // ---- getting LOGFILENAME
     if (command->raised_flags[LOGFILE]) {
         if (getenv("LOGFILENAME") != NULL) {
@@ -410,8 +421,6 @@ int main(int argc, char *argv[]) {
     // "w" flag creates a file if it does not already exist
     // w --> O_WRONLY | O_CREAT | O_TRUNC
     if (command->raised_flags[OUTFILE]) {
-        signal(SIGUSR1, sigusr_handler);
-        signal(SIGUSR2, sigusr_handler);
         print_location = fopen(command->outfile, "w");
     }
     else
@@ -463,8 +472,6 @@ int main(int argc, char *argv[]) {
     free(info);
     free(command);
 
-    munmap(files, sizeof *files);
-    munmap(dirs, sizeof *dirs);
 
     exit(EXIT_SUCCESS); 
 }

@@ -10,7 +10,6 @@
 #include <dirent.h>
 #include <signal.h>
 #include <errno.h>
-#include <sys/mman.h>
 
 // ---- Command flags
 #define FLAG_NUMBER     4
@@ -63,5 +62,6 @@ typedef struct {
     int cryptohash_flags[MAX_CRYPTOHASH_FLAGS+1];
     int raised_flags[FLAG_NUMBER+1];
     char logfilename[MAX_FILE_NAME+1];
+    int parentPID;
 } command_info;
 
