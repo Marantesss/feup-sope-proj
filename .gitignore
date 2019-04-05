@@ -10,3 +10,6 @@
 
 #ignore forensic executable from makefile
 forensic
+
+#ignore dependency files
+forensic.d

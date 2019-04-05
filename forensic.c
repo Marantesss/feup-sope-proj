@@ -32,7 +32,8 @@ void sigusr_handler(int signo) {
 
 //------kill(pid, SIGINT);
 //so chamar esta função quando tiver ativa a flag -v
-void write_log(struct timespec tstart, act_type act, char *exec_parameters){
+//string   aux   tem os parametros em caso de COMMAND e o nome do signal em caso de SIGNAL
+void write_log(struct timespec tstart, act_type act, char *aux){
     struct timespec tend;
     char act_to_log[MAX_FILE_NAME+1] = "";
     double diff;
@@ -42,25 +43,21 @@ void write_log(struct timespec tstart, act_type act, char *exec_parameters){
     if (logfilep == NULL)
         exit(EXIT_FAILURE);
     
-    if(!getenv("LOGFILENAME")){
-        printf("Variavel \"LOGFILENAME\" nao esta definida!\n");
-        exit(EXIT_FAILURE);
-    }
     //------
     //o que se segue escrito na string act_to_log sao exemplos, é como deve ficar
     switch (act){
         case COMMAND:
         //------
-        //commando e os seus parametros
+        //comando e os seus parametros
         strcat(act_to_log, "COMMAND ");
-        strcat(act_to_log, exec_parameters);
+        strcat(act_to_log, aux); //parametros do comando
             break;
         case SIGNAL:
         //------
         //quando se usa um sinal
         //sacar o sinal e concatenar na string
         strcat(act_to_log, "SIGNAL ");
-        //strcat(act_to_log, nome do fucking sinal fam);
+        strcat(act_to_log, aux);
             break;
         case ANALIZED:
         //------
@@ -259,8 +256,10 @@ void listdir(char* path, FILE* print_location, file_info* info, struct timespec 
         char *name = entry->d_name;
         // ---- directory is a folder and -r flag is turned on
         if (entry->d_type == DT_DIR) {
-            if (command->raised_flags[OUTFILE])
+            if (command->raised_flags[OUTFILE]){
                 kill(getpid(), SIGUSR1);
+                write_log(tstart, SIGNAL, "SIGUSR1");
+            }
             if (!strcmp(name, ".") || !strcmp(name, ".."))
                 continue;
             else if (command->raised_flags[RECURSIVE]) {
@@ -280,8 +279,10 @@ void listdir(char* path, FILE* print_location, file_info* info, struct timespec 
         }
         // ---- directory is a file
         else {
-            if (command->raised_flags[OUTFILE])
+            if (command->raised_flags[OUTFILE]){
                 kill(getpid(), SIGUSR2);
+                write_log(tstart, SIGNAL, "SIGUSR2");
+            }
             if (path[len-1] != '/') {
                 path[len] = '/';
                 strcpy(path + len + 1, name);
