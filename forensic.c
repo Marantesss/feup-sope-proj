@@ -40,11 +40,11 @@ void write_log(struct timespec tstart, act_type act, char *exec_parameters){
         strcat(act_to_log, exec_parameters);
             break;
         case SIGNAL:
-        strcat(act_to_log, "SIGNAL ");
-        //act_to_log = "SIGNAL USR1";
         //------
         //quando se usa um sinal
         //sacar o sinal e concatenar na string
+        strcat(act_to_log, "SIGNAL ");
+        //strcat(act_to_log, nome do fucking sinal fam);
             break;
         case ANALIZED:
         //------
@@ -315,9 +315,6 @@ int main(int argc, char *argv[]) {
         printf("Usage: %s [-r] [-h [md5[,sha1[,sha256]]] [-o <outfile>] [-v] <file|dir>\n", argv[0]);
         exit(EXIT_SUCCESS);
     }
-
-    // ---- saving exec name
-    strcpy(command->exec_name, argv[0]);
 
     // ----
     //useful to write the command in the log file, act part
