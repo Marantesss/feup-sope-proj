@@ -72,8 +72,6 @@ void write_log(struct timespec tstart, act_type act, char *aux){
     fprintf(logfilep, "%.2lf - %08ld - %s\n", diff, (long) pid, act_to_log);
     
     fclose(logfilep);
-
-    printf("Log successfully written!\n");
 }
 
 void print_fileinfo(FILE* print_location, file_info* info) {
@@ -468,6 +466,8 @@ int main(int argc, char *argv[]) {
     free(info);
     free(command);
 
+    if(command->raised_flags[LOGFILE])
+        printf("Log successfully written!\n");
 
     exit(EXIT_SUCCESS); 
 }
