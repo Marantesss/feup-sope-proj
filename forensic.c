@@ -18,7 +18,6 @@ void signal_handler(int signo) {
             break;
         case SIGUSR2:
             files++;
-            printf("New file\n");
             break;
         case SIGUSR1:
             dirs++;
@@ -28,8 +27,8 @@ void signal_handler(int signo) {
 }
 
 //------kill(pid, SIGINT);
-//so chamar esta função quando tiver ativa a flag -v
-//string   aux   tem os parametros em caso de COMMAND e o nome do signal em caso de SIGNAL
+// so chamar esta função quando tiver ativa a flag -v
+// string   aux   tem os parametros em caso de COMMAND e o nome do signal em caso de SIGNAL
 void write_log(struct timespec tstart, act_type act, char *aux){
     struct timespec tend;
     char act_to_log[MAX_FILE_NAME+1] = "";
@@ -75,7 +74,6 @@ void write_log(struct timespec tstart, act_type act, char *aux){
     fclose(logfilep);
 
     printf("Log successfully written!\n");
-
 }
 
 void print_fileinfo(FILE* print_location, file_info* info) {
@@ -253,13 +251,13 @@ void listdir(char* path, FILE* print_location, file_info* info, struct timespec 
         char *name = entry->d_name;
         // ---- directory is a folder and -r flag is turned on
         if (entry->d_type == DT_DIR) {
-            if (command->raised_flags[OUTFILE]){
-                kill(getpid(), SIGUSR1);
-                write_log(tstart, SIGNAL, "SIGUSR1");
-            }
             if (!strcmp(name, ".") || !strcmp(name, ".."))
                 continue;
             else if (command->raised_flags[RECURSIVE]) {
+                if (command->raised_flags[OUTFILE]){
+                    kill(command->parentPID, SIGUSR1);
+                    write_log(tstart, SIGNAL, "SIGUSR1");
+                }
                 pid = fork();
                 // --- child
                 if (pid == 0) {
@@ -277,7 +275,7 @@ void listdir(char* path, FILE* print_location, file_info* info, struct timespec 
         // ---- directory is a file
         else {
             if (command->raised_flags[OUTFILE]){
-                kill(getpid(), SIGUSR2);
+                kill(command->parentPID, SIGUSR2);
                 write_log(tstart, SIGNAL, "SIGUSR2");
             }
             if (path[len-1] != '/') {
