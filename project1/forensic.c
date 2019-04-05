@@ -397,7 +397,6 @@ int main(int argc, char *argv[]) {
 
     // ---- getting parent process ID
     command->parentPID = getpid();
-    printf("%d\n", command->parentPID);
 
     // ---- getting LOGFILENAME
     if (command->raised_flags[LOGFILE]) {
@@ -466,8 +465,13 @@ int main(int argc, char *argv[]) {
     free(info);
     free(command);
 
-    if(command->raised_flags[LOGFILE])
-        printf("Log successfully written!\n");
+    // ---- printing some info
+    if(getpid() == command->parentPID) {
+        if (command->raised_flags[OUTFILE])
+            printf("Data saved on file %s\n", command->outfile);
+        if (command->raised_flags[LOGFILE])
+            printf("Execution records saved on file %s\n", command->logfilename);
+    }
 
     exit(EXIT_SUCCESS); 
 }
