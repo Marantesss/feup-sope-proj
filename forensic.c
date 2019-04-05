@@ -1,12 +1,14 @@
 #include "utils.h"
 
 command_info *command = NULL; /**< @brief Struct containing command information*/
+volatile int exit_program = 0;
 
 static int *dirs = 0;
 static int *files = 0;
 
 void sigint_handler(int signo) {
-    exit(1);
+    if (signo == SIGTERM)
+        exit_program = 1;
 }
 
 void sig_files_handler(){
@@ -117,6 +119,11 @@ void print_fileinfo(FILE* print_location, file_info* info) {
         fwrite(info->sha256_hash, sizeof(char), strlen(info->sha256_hash), print_location);
     }
     fwrite("\n", sizeof(char), strlen("\n"), print_location);
+
+    // ---- check if ctrl+c was pressed
+    if (exit_program) {
+        exit(EXIT_FAILURE);
+    }
 }
 
 void dump_stat(char* path, file_info *info) {
