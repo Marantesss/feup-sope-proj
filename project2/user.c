@@ -26,14 +26,17 @@ void user_connect_server(int* fifo_server, int* fifo_user) {
     printf("\nTESTING USER FIFO PATH: %s\n", user_fifo_path);
 
     // ---- creating user fifo
-    if(mkfifo(user_fifo_path, 0660)) {
+    if(mkfifo(user_fifo_path, 0666)) {
         printf("\nfifo_user: Create attempt failed\n");
     }
+    printf("dani\n");
     // ---- opening user fifo
     //*fifo_server=open(user_fifo_path, O_RDONLY);
-    *fifo_user = open(user_fifo_path, O_WRONLY | O_NONBLOCK);
+    *fifo_user = open(user_fifo_path, O_WRONLY);// | O_NONBLOCK);
+    printf("here %d\n", *fifo_user);
     if (*fifo_user == -1) {
         printf("\nfifo_user: Open attempt failed\n");
+        perror("error: ");
         exit(RC_USR_DOWN);
     }
 
