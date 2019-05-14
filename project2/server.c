@@ -1,29 +1,18 @@
-#include "sope.h"
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/file.h>
-#include <string.h>
-#include <stdlib.h>
+#include "server.h"
 
-/*
-PLAN OF ATTACK:
-1. server creates server fifo
-2. server gets user information
-3. server validates user information and creates user fifo
-4. server gets user request
-5. server validates user request
-6. server sends requested information through user fifo
-*/
-
-int readline(int fd, char *str);
-void server_fifo_create(int* fifo_server);
-void user_fifo_create(char* user_fifo_path);
-void server_connect_user(int* fifo_server, int* fifo_user);
-
-int main() {
+int main(int argc, char *argv[]) {
    setbuf(stdout, NULL); // prints stuff without needing \n
    
    int fifo_user, fifo_server;
+
+   printf("WARNING: No verifications are being made to command arguments!!!\n");
+
+   if(argc != 3) {
+      printf("Too few arguments\n");
+      exit(EXIT_FAILURE);
+   }
+
+   create_admin_account(&accounts[0], argv[2]);
 
    server_fifo_create(&fifo_server);
 
@@ -31,6 +20,74 @@ int main() {
       server_connect_user(&fifo_server, &fifo_user);
 
    return 0;
+}
+
+void create_admin_account(bank_account_t* admin_account, char* password) {
+   printf("CREATING ADMIN ACCOUNT...");
+   // ---- checking if account credentials are valid
+   // checking password
+   size_t password_length = strlen(password);
+   if (!between(MIN_PASSWORD_LEN, password_length, MAX_PASSWORD_LEN)) {
+      printf("ERROR: Invalid password\n");
+      exit(EXIT_FAILURE);
+   }
+   strtok(password, " ");
+   if (strlen(password) != password_length) {
+      printf("ERROR: Invalid password\n");
+      exit(EXIT_FAILURE);
+   }
+
+   admin_account->account_id = ADMIN_ACCOUNT_ID;
+   admin_account->balance = 0;
+   // TODO generate random salt
+   strcpy(admin_account->salt,"something");
+   // TODO generate hash
+   strcpy(admin_account->hash, strcat(password, admin_account->salt));
+   
+   printf("\nADMIN ACCOUNT CREATED.\n");
+}
+
+int create_user_account(bank_account_t* user_account, unsigned int id, unsigned int balance, char* password) {
+   printf("CREATING USER ACCOUNT...");
+   // ---- checking if account credentials are valid
+   // checking id
+   if (!between(1, id, MAX_BANK_ACCOUNTS)) {
+      printf("ERROR: Invalid ID\n");
+      return RC_OTHER;
+   }
+   for (int i = 0; i < MAX_BANK_ACCOUNTS; i++)
+      if (id == accounts[i].account_id) {
+         printf("ERROR: Invalid ID\n");
+         return RC_ID_IN_USE;
+      }
+   // checking balance
+   if (!between(MIN_BALANCE, balance, MAX_BALANCE)) {
+      printf("ERROR: Invalid balance\n");
+      return RC_OTHER;
+   }
+   // checking password
+   size_t password_length = strlen(password);
+   if (!between(MIN_PASSWORD_LEN, password_length, MAX_PASSWORD_LEN)) {
+      printf("ERROR: Invalid password\n");
+      return RC_OTHER;
+   }
+   strtok(password, " ");
+   if (strlen(password) != password_length) {
+      printf("ERROR: Invalid password\n");
+      return RC_OTHER;
+   }
+
+   // ---- creating account
+   user_account->account_id = id;
+   user_account->balance = balance;
+   // TODO generate random salt
+   strcpy(user_account->salt,"something");
+   // TODO generate hash
+   strcpy(user_account->hash, strcat(password, user_account->salt));
+
+   printf("\nUSER ACCOUNT CREATED.\n");
+
+   return RC_OK;
 }
 
 void server_fifo_create(int* fifo_server) {

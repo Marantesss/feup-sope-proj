@@ -1,22 +1,4 @@
-#include "sope.h"
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/file.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-
-/*
-PLAN OF ATTACK:
-1. user connects to server fifo
-2. user sends pid and request
-3. user connects to user fifo created by the server
-3. user gets responde from user fifo
-*/
-
-int readline(int fd, char *str);
-void user_connect_server(int* fifo_server, int* fifo_user);
-void get_user_fifo_path(char* user_fifo_path);
+#include "user.h"
 
 int main() {
    setbuf(stdout, NULL); // prints stuff without needing \n
