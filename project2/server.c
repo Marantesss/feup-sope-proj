@@ -123,9 +123,8 @@ void create_user_account(req_create_account_t* create, rep_value_t* rep_value) {
       rep_value->header.ret_code = RC_OTHER;
       return;
    }
-   // TODO fazer com find
-   strtok(create->password, " ");
-   if (strlen(create->password) != password_length) {
+   // checking for spaces in password
+   if (strchr(create->password, ' ') != NULL) {
       printf("ERROR: Invalid password - password contains spaces\n");
       rep_value->header.ret_code = RC_OTHER;
       return;
@@ -175,7 +174,7 @@ int validate_user(req_header_t *header, rep_header_t* rep_header) {
 }
 
 int validate_admin(req_header_t *header, rep_header_t* rep_header) {
-   if (!is_admin(header->account_id)) {
+   if (!(is_admin(header->account_id))) {
       rep_header->ret_code = RC_OP_NALLOW;
       return 0;
    }
