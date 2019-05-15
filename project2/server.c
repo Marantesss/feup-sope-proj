@@ -196,8 +196,25 @@ int validate_user(req_header_t *header, rep_header_t* rep_header) {
       return 0;
    }
    char req_hash[HASH_LEN + 1];
-   strcpy(req_hash, strcat(header->password, accounts[header->account_id].salt));
    // TODO make req_hash with sha256sum
+   char command[] = "echo -n \"";
+
+   strcat(command, header->password);
+   strcat(command, accounts[header->account_id].salt);
+   strcat(command, "\" | sha256sum");
+
+   FILE *f = popen(command, "r");
+
+   char hash[HASH_LEN + 4];
+
+   while (fgets(hash, 10000, f) != NULL) {
+      // printf("%s", out);
+   }
+   
+   pclose(f);
+
+   strcpy(req_hash, strtok(hash, " "));
+
    if (strcmp(req_hash, accounts[header->account_id].hash)) {
       rep_header->ret_code = RC_LOGIN_FAIL;
       return 0;
@@ -216,6 +233,24 @@ int validate_admin(req_header_t *header, rep_header_t* rep_header) {
    char req_hash[HASH_LEN + 1];
    strcpy(req_hash, strcat(header->password, accounts[header->account_id].salt));
    // TODO make req_hash with sha256sum
+   char command[] = "echo -n \"";
+
+   strcat(command, header->password);
+   strcat(command, accounts[header->account_id].salt);
+   strcat(command, "\" | sha256sum");
+
+   FILE *f = popen(command, "r");
+
+   char hash[HASH_LEN + 4];
+
+   while (fgets(hash, 10000, f) != NULL) {
+      // printf("%s", out);
+   }
+   
+   pclose(f);
+
+   strcpy(req_hash, strtok(hash, " "));
+   
    if (strcmp(req_hash, accounts[header->account_id].hash)) {
       rep_header->ret_code = RC_LOGIN_FAIL;
       return 0;
@@ -249,11 +284,11 @@ void create_admin_account(char* password) {
    strcpy(salt, rand_string(salt, 64));
    strcpy(accounts[ADMIN_ACCOUNT_ID].salt, salt);
    // TODO generate hash
-   char command[] = "echo -n ";
+   char command[] = "echo -n \"";
 
    strcat(command, password);
    strcat(command, salt);
-   strcat(command, " | sha256sum");
+   strcat(command, "\" | sha256sum");
 
    FILE *f = popen(command, "r");
 
@@ -265,9 +300,7 @@ void create_admin_account(char* password) {
    
    pclose(f);
 
-   strtok(hash, " ");
-
-   strcpy(accounts[ADMIN_ACCOUNT_ID].hash, hash);
+   strcpy(accounts[ADMIN_ACCOUNT_ID].hash, strtok(hash, " "));
    
    printf("\nADMIN ACCOUNT CREATED.\n");
 }
