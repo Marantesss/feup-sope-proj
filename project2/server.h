@@ -13,15 +13,34 @@
  * 
  */
 #define between(min, num, max) ((min) <= (num) && (num) <= (max)) ? 1 : 0 
-
+/**
+ * 
+ */
 
 /**
  * 
  */
 bank_account_t accounts[MAX_BANK_ACCOUNTS];
 
+/**
+ * 
+ */
 int num_threads;
 
+/**
+ * 
+ */
+int validate_request(tlv_request_t *req);
+
+/**
+ * 
+ */
+int validate_admin(req_header_t *header);
+
+/**
+ * 
+ */
+int validate_user(req_header_t *header);
 
 /**
  * 
@@ -53,4 +72,7 @@ void user_fifo_create(char* user_fifo_path);
  */
 int readline(int fd, char *str);
 
+/**
+ * 
+ */
 int read_request(int fd, tlv_request_t* req);

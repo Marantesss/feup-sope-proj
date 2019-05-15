@@ -11,7 +11,9 @@ int main() {
 
    tlv_request_t req;
    create_request(&req);
-   write(fifo_server, &req, 1);
+
+   write(fifo_server, &req, sizeof(tlv_request_t));
+   
    printf("req: %ld\t&req: %ld\n", sizeof(req), sizeof(&req));
 
    return 0;
@@ -63,16 +65,18 @@ int readline(int fd, char *str) {
 }
 
 void create_request(tlv_request_t* req) {
-   // type
+   // ---- type
    req->type = OP_CREATE_ACCOUNT;
-   // length
-   req->length = 20;
-   // value
-   req->value.header.account_id = 1;
+   // ---- value
+   // header
+   req->value.header.account_id = 0;
    req->value.header.op_delay_ms = 10;
-   strcpy(req->value.header.password,"ola");
+   strcpy(req->value.header.password,"olaolaol");
    req->value.header.pid = getpid();
+   // create
    req->value.create.account_id = 2;
    req->value.create.balance = 100;
    strcpy(req->value.create.password, "ola");
+   // ---- length
+   req->length = sizeof(req->value);
 }

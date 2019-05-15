@@ -12,9 +12,12 @@ int main(int argc, char *argv[]) {
       exit(EXIT_FAILURE);
    }
 
-   num_threads = min(atoi(argv[1]), 10);
+   // maybe not necessary
+   //memset(accounts, 0, MAX_BANK_ACCOUNTS*sizeof(bank_account_t));
+   
+   num_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
 
-   create_admin_account(&accounts[0], argv[2]);
+   create_admin_account(&accounts[ADMIN_ACCOUNT_ID], argv[2]);
 
    server_fifo_create(&fifo_server);
 
@@ -34,7 +37,56 @@ int main(int argc, char *argv[]) {
       printf("stuck in read_request\n");
    }
 
+   if (validate_request(&req))
+      // akcnowledge request
+
    return 0;
+}
+
+
+
+int validate_request(tlv_request_t *req) {
+   switch (req->type) {
+      case OP_CREATE_ACCOUNT:
+      case OP_SHUTDOWN:
+         if(validate_admin(&req->value.header))
+            return 1;
+         break;
+      case OP_BALANCE:
+      case OP_TRANSFER:
+         if(validate_user(&req->value.header))
+            return 1;
+         break;
+      default:
+         printf("ERROR: Invalid Operation\n");
+         return RC_OTHER;
+   }
+
+   return 0;
+}
+
+int validate_user(req_header_t *header) {
+   if (header->account_id == 0)
+      return 0;
+   char req_hash[HASH_LEN + 1];
+   strcpy(req_hash, strcat(header->password, accounts[header->account_id].salt));
+   // TODO make req_hash with sha256sum
+   if (strcmp(req_hash, accounts[header->account_id].hash))
+      return 0;
+   else
+      return 1;
+}
+
+int validate_admin(req_header_t *header) {
+   if (header->account_id != 0)
+      return 0;
+   char req_hash[HASH_LEN + 1];
+   strcpy(req_hash, strcat(header->password, accounts[header->account_id].salt));
+   // TODO make req_hash with sha256sum
+   if (strcmp(req_hash, accounts[header->account_id].hash))
+      return 0;
+   else
+      return 1;
 }
 
 void create_admin_account(bank_account_t* admin_account, char* password) {
@@ -70,11 +122,10 @@ int create_user_account(bank_account_t* user_account, unsigned int id, unsigned 
       printf("ERROR: Invalid ID\n");
       return RC_OTHER;
    }
-   for (int i = 0; i < MAX_BANK_ACCOUNTS; i++)
-      if (id == accounts[i].account_id) {
-         printf("ERROR: Invalid ID\n");
-         return RC_ID_IN_USE;
-      }
+   if (id == accounts[id].account_id) {
+      printf("ERROR: Invalid ID\n");
+      return RC_ID_IN_USE;
+   }
    // checking balance
    if (!between(MIN_BALANCE, balance, MAX_BALANCE)) {
       printf("ERROR: Invalid balance\n");
@@ -86,6 +137,7 @@ int create_user_account(bank_account_t* user_account, unsigned int id, unsigned 
       printf("ERROR: Invalid password\n");
       return RC_OTHER;
    }
+   //fazer com find
    strtok(password, " ");
    if (strlen(password) != password_length) {
       printf("ERROR: Invalid password\n");
@@ -181,7 +233,7 @@ int read_request(int fd, tlv_request_t* req) {
    int n;
 
    // reads pointer
-   n = read(fd, req, 1);
+   n = read(fd, req, sizeof(tlv_request_t));
    if (n > 0)
       printf("type: %d\tlenght: %d\tvalue: PID: %d\n", req->type, req->length, req->value.header.pid);
 
