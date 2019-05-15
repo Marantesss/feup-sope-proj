@@ -28,6 +28,13 @@ int main(int argc, char *argv[], char *envp[])
 
    user_connect_server(&fifo_server, &fifo_user);
 
+   write(fifo_server, "ola", strlen("ola") + 1);
+
+   tlv_request_t req;
+   create_request(&req);
+
+   write(fifo_server, &req, sizeof(tlv_request_t));
+
    //------------parsing arguments------------
 
    // **** id da conta
@@ -142,4 +149,15 @@ void create_request(tlv_request_t* req) {
    req->value.create.account_id = 2;
    req->value.create.balance = 100;
    strcpy(req->value.create.password, "ola");
+}
+
+int read_reply(int fd, tlv_request_t* req) {
+   int n;
+
+   // reads pointer
+   n = read(fd, req, 1);
+   if (n > 0)
+      printf("type: %d\tlenght: %d\tvalue: PID: %d\n", req->type, req->length, req->value.header.pid);
+
+   return (n>0);
 }
