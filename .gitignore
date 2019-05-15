@@ -16,3 +16,6 @@ forensic
 
 #ignore dependency files
 forensic.d
+
+#ignore my test puppy
+cena.c
