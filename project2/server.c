@@ -45,6 +45,20 @@ int main(int argc, char *argv[]) {
    return 0;
 }
 
+static char *rand_string(char *str, size_t size)
+{
+    const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJK...";
+    if (size) {
+        --size;
+        for (size_t n = 0; n < size; n++) {
+            int key = rand() % (int) (sizeof charset - 1);
+            str[n] = charset[key];
+        }
+        str[size] = '\0';
+    }
+    return str;
+}
+
 void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply) {
    // ---- reply type
    reply->type = req->type;
@@ -134,9 +148,30 @@ void create_user_account(req_create_account_t* create, rep_value_t* rep_value) {
    accounts[create->account_id].account_id = create->account_id;
    accounts[create->account_id].balance = create->balance;
    // TODO generate random salt
-   strcpy(accounts[create->account_id].salt,"something");
+   char salt[SALT_LEN + 1];
+   
+   strcpy(salt, rand_string(salt, 64));
+   strcpy(accounts[create->account_id].salt, salt);
    // TODO generate hash
-   strcpy(accounts[create->account_id].hash, strcat(create->password, accounts[create->account_id].salt));
+   char command[] = "echo -n ";
+
+   strcat(command, create->password);
+   strcat(command, salt);
+   strcat(command, " | sha256sum");
+
+   FILE *f = popen(command, "r");
+
+   char hash[HASH_LEN + 4];
+
+   while (fgets(hash, 10000, f) != NULL) {
+      // printf("%s", out);
+   }
+   
+   pclose(f);
+
+   strtok(hash, " ");
+
+   strcpy(accounts[create->account_id].hash, hash);
 
    printf("\nUSER ACCOUNT CREATED.\n");
 }
@@ -209,9 +244,30 @@ void create_admin_account(char* password) {
    accounts[ADMIN_ACCOUNT_ID].account_id = ADMIN_ACCOUNT_ID;
    accounts[ADMIN_ACCOUNT_ID].balance = 0;
    // TODO generate random salt
-   strcpy(accounts[ADMIN_ACCOUNT_ID].salt,"something");
+   char salt[SALT_LEN + 1];
+   
+   strcpy(salt, rand_string(salt, 64));
+   strcpy(accounts[ADMIN_ACCOUNT_ID].salt, salt);
    // TODO generate hash
-   strcpy(accounts[ADMIN_ACCOUNT_ID].hash, strcat(password, accounts[ADMIN_ACCOUNT_ID].salt));
+   char command[] = "echo -n ";
+
+   strcat(command, password);
+   strcat(command, salt);
+   strcat(command, " | sha256sum");
+
+   FILE *f = popen(command, "r");
+
+   char hash[HASH_LEN + 4];
+
+   while (fgets(hash, 10000, f) != NULL) {
+      // printf("%s", out);
+   }
+   
+   pclose(f);
+
+   strtok(hash, " ");
+
+   strcpy(accounts[ADMIN_ACCOUNT_ID].hash, hash);
    
    printf("\nADMIN ACCOUNT CREATED.\n");
 }
