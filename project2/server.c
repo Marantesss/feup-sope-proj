@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
    
    num_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
 
-   create_admin_account(&accounts[ADMIN_ACCOUNT_ID], argv[2]);
+   create_admin_account(argv[2]);
 
    server_fifo_create(&fifo_server);
 
@@ -31,30 +31,61 @@ int main(int argc, char *argv[]) {
    }
    printf("%s\n", test);
 
+   // ---- getting request from user
    tlv_request_t req;
    while(!read_request(fifo_server, &req)) {
       sleep(1);
       printf("stuck in read_request\n");
    }
 
-   if (validate_request(&req))
-      // akcnowledge request
+   // ---- getting reply from server
+   tlv_reply_t reply;
+   acknowledge_request(&req, &reply);
 
    return 0;
 }
 
+void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply) {
+   // ---- reply type
+   reply->type = req->type;
 
+   // ---- reply value
+   // header - account id
+   reply->value.header.account_id = req->value.header.account_id;
+   // header - ret_code + balance/transfer/shutdown;
+   if (validate_request(req, reply))
+      switch (req->type) {
+         case OP_CREATE_ACCOUNT:
+            create_user_account(&req->value.create, &reply->value);
+            break;
+         case OP_BALANCE:
+            check_user_balance(&req->value.create, &reply->value);
+            break;
+         case OP_TRANSFER:
+            create_user_transfer(&req->value.create, &reply->value);
+            break;
+         case OP_SHUTDOWN:
+            shutdown_server(&req->value.create, &reply->value);
+            break;
+         default:
+            printf("ERROR: Invalid Operation\n");
+            break;
+      }
 
-int validate_request(tlv_request_t *req) {
+   // ---- reply length
+   reply->length = sizeof(reply->value);
+}
+
+int validate_request(tlv_request_t *req, tlv_reply_t *reply) {
    switch (req->type) {
       case OP_CREATE_ACCOUNT:
       case OP_SHUTDOWN:
-         if(validate_admin(&req->value.header))
+         if(validate_admin(&req->value.header, &reply->value.header))
             return 1;
          break;
       case OP_BALANCE:
       case OP_TRANSFER:
-         if(validate_user(&req->value.header))
+         if(validate_user(&req->value.header, &reply->value.header))
             return 1;
          break;
       default:
@@ -65,31 +96,101 @@ int validate_request(tlv_request_t *req) {
    return 0;
 }
 
-int validate_user(req_header_t *header) {
-   if (header->account_id == 0)
+void create_user_account(req_create_account_t* create, rep_value_t* rep_value) {
+   printf("CREATING USER ACCOUNT...");
+   // ---- checking if account credentials are valid
+   // checking id
+   if (!between(1, create->account_id, MAX_BANK_ACCOUNTS)) {
+      printf("ERROR: Invalid ID - too small or too big\n");
+      rep_value->header.ret_code = RC_OTHER;
+      return;
+   }
+   if (create->account_id == accounts[create->account_id].account_id) {
+      printf("ERROR: Invalid ID - id already in use\n");
+      rep_value->header.ret_code = RC_ID_IN_USE;
+      return;
+   }
+   // checking balance
+   if (!between(MIN_BALANCE, create->balance, MAX_BALANCE)) {
+      printf("ERROR: Invalid balance -  too little or too much\n");
+      rep_value->header.ret_code = RC_OTHER;
+      return;
+   }
+   // checking password
+   size_t password_length = strlen(create->password);
+   if (!between(MIN_PASSWORD_LEN, password_length, MAX_PASSWORD_LEN)) {
+      printf("ERROR: Invalid password - too long or too short\n");
+      rep_value->header.ret_code = RC_OTHER;
+      return;
+   }
+   // TODO fazer com find
+   strtok(create->password, " ");
+   if (strlen(create->password) != password_length) {
+      printf("ERROR: Invalid password - password contains spaces\n");
+      rep_value->header.ret_code = RC_OTHER;
+      return;
+   }
+
+   // ---- creating account
+   accounts[create->account_id].account_id = create->account_id;
+   accounts[create->account_id].balance = create->balance;
+   // TODO generate random salt
+   strcpy(accounts[create->account_id].salt,"something");
+   // TODO generate hash
+   strcpy(accounts[create->account_id].hash, strcat(create->password, accounts[create->account_id].salt));
+
+   printf("\nUSER ACCOUNT CREATED.\n");
+}
+
+void check_user_balance(req_create_account_t* create, rep_value_t* rep_value) {
+   
+}
+
+void create_user_transfer(req_create_account_t* create, rep_value_t* rep_value) {
+
+}
+
+void shutdown_server(req_create_account_t* create, rep_value_t* rep_value) {
+
+}
+
+int validate_user(req_header_t *header, rep_header_t* rep_header) {
+   if (is_admin(header->account_id)) {
+      rep_header->ret_code = RC_OP_NALLOW;
       return 0;
+   }
    char req_hash[HASH_LEN + 1];
    strcpy(req_hash, strcat(header->password, accounts[header->account_id].salt));
    // TODO make req_hash with sha256sum
-   if (strcmp(req_hash, accounts[header->account_id].hash))
+   if (strcmp(req_hash, accounts[header->account_id].hash)) {
+      rep_header->ret_code = RC_LOGIN_FAIL;
       return 0;
-   else
+   }
+   else {
+      rep_header->ret_code = RC_OK;
       return 1;
+   }
 }
 
-int validate_admin(req_header_t *header) {
-   if (header->account_id != 0)
+int validate_admin(req_header_t *header, rep_header_t* rep_header) {
+   if (!is_admin(header->account_id)) {
+      rep_header->ret_code = RC_OP_NALLOW;
       return 0;
+   }
    char req_hash[HASH_LEN + 1];
    strcpy(req_hash, strcat(header->password, accounts[header->account_id].salt));
    // TODO make req_hash with sha256sum
-   if (strcmp(req_hash, accounts[header->account_id].hash))
+   if (strcmp(req_hash, accounts[header->account_id].hash)) {
+      rep_header->ret_code = RC_LOGIN_FAIL;
       return 0;
-   else
+   }
+   else {
+      rep_header->ret_code = RC_OK;
       return 1;
+   }
 }
 
-void create_admin_account(bank_account_t* admin_account, char* password) {
+void create_admin_account(char* password) {
    printf("CREATING ADMIN ACCOUNT...");
    // ---- checking if account credentials are valid
    // checking password
@@ -104,57 +205,14 @@ void create_admin_account(bank_account_t* admin_account, char* password) {
       exit(EXIT_FAILURE);
    }
 
-   admin_account->account_id = ADMIN_ACCOUNT_ID;
-   admin_account->balance = 0;
+   accounts[ADMIN_ACCOUNT_ID].account_id = ADMIN_ACCOUNT_ID;
+   accounts[ADMIN_ACCOUNT_ID].balance = 0;
    // TODO generate random salt
-   strcpy(admin_account->salt,"something");
+   strcpy(accounts[ADMIN_ACCOUNT_ID].salt,"something");
    // TODO generate hash
-   strcpy(admin_account->hash, strcat(password, admin_account->salt));
+   strcpy(accounts[ADMIN_ACCOUNT_ID].hash, strcat(password, accounts[ADMIN_ACCOUNT_ID].salt));
    
    printf("\nADMIN ACCOUNT CREATED.\n");
-}
-
-int create_user_account(bank_account_t* user_account, unsigned int id, unsigned int balance, char* password) {
-   printf("CREATING USER ACCOUNT...");
-   // ---- checking if account credentials are valid
-   // checking id
-   if (!between(1, id, MAX_BANK_ACCOUNTS)) {
-      printf("ERROR: Invalid ID\n");
-      return RC_OTHER;
-   }
-   if (id == accounts[id].account_id) {
-      printf("ERROR: Invalid ID\n");
-      return RC_ID_IN_USE;
-   }
-   // checking balance
-   if (!between(MIN_BALANCE, balance, MAX_BALANCE)) {
-      printf("ERROR: Invalid balance\n");
-      return RC_OTHER;
-   }
-   // checking password
-   size_t password_length = strlen(password);
-   if (!between(MIN_PASSWORD_LEN, password_length, MAX_PASSWORD_LEN)) {
-      printf("ERROR: Invalid password\n");
-      return RC_OTHER;
-   }
-   //fazer com find
-   strtok(password, " ");
-   if (strlen(password) != password_length) {
-      printf("ERROR: Invalid password\n");
-      return RC_OTHER;
-   }
-
-   // ---- creating account
-   user_account->account_id = id;
-   user_account->balance = balance;
-   // TODO generate random salt
-   strcpy(user_account->salt,"something");
-   // TODO generate hash
-   strcpy(user_account->hash, strcat(password, user_account->salt));
-
-   printf("\nUSER ACCOUNT CREATED.\n");
-
-   return RC_OK;
 }
 
 void server_fifo_create(int* fifo_server) {

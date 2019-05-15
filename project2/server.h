@@ -13,6 +13,12 @@
  * 
  */
 #define between(min, num, max) ((min) <= (num) && (num) <= (max)) ? 1 : 0 
+
+/**
+ * 
+ */
+#define is_admin(id) id == 0 ? 1 : 0 
+
 /**
  * 
  */
@@ -30,27 +36,47 @@ int num_threads;
 /**
  * 
  */
-int validate_request(tlv_request_t *req);
+void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply);
 
 /**
  * 
  */
-int validate_admin(req_header_t *header);
+int validate_request(tlv_request_t *req, tlv_reply_t *reply);
 
 /**
  * 
  */
-int validate_user(req_header_t *header);
+int validate_admin(req_header_t *header, rep_header_t* rep_header);
 
 /**
  * 
  */
-void create_admin_account(bank_account_t* admin_account, char* password);
+int validate_user(req_header_t *header, rep_header_t* rep_header);
 
 /**
  * 
  */
-int create_user_account(bank_account_t* user_account, unsigned int id, unsigned int balance, char* password);
+void create_admin_account(char* password);
+
+/**
+ * 
+ */
+void create_user_account(req_create_account_t* create, rep_value_t* rep_value);
+
+/**
+ * 
+ */
+void check_user_balance(req_create_account_t* create, rep_value_t* rep_value);
+
+/**
+ * 
+ */
+void create_user_transfer(req_create_account_t* create, rep_value_t* rep_value);
+
+/**
+ * 
+ */
+void shutdown_server(req_create_account_t* create, rep_value_t* rep_value);
 
 /**
  * 
