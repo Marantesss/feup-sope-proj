@@ -88,6 +88,9 @@ int main(int argc, char *argv[], char *envp[])
       break;
    }
 
+   // **** adicionar length
+   request->length = sizeof(request->value);
+
    return 0;
 }
 
