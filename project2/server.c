@@ -59,13 +59,13 @@ void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply) {
             create_user_account(&req->value.create, &reply->value);
             break;
          case OP_BALANCE:
-            check_user_balance(&req->value.create, &reply->value);
+            check_user_balance(req->value.header.account_id, &reply->value);
             break;
          case OP_TRANSFER:
-            create_user_transfer(&req->value.create, &reply->value);
+            create_user_transfer(&req->value.transfer, &reply->value);
             break;
          case OP_SHUTDOWN:
-            shutdown_server(&req->value.create, &reply->value);
+            shutdown_server(&reply->value);
             break;
          default:
             printf("ERROR: Invalid Operation\n");
@@ -142,6 +142,7 @@ void create_user_account(req_create_account_t* create, rep_value_t* rep_value) {
    printf("\nUSER ACCOUNT CREATED.\n");
 }
 
+/*
 void check_user_balance(uint32_t id, rep_value_t* rep_value) {
    
 }
@@ -153,6 +154,7 @@ void create_user_transfer(req_transfer_t* transfer, rep_value_t* rep_value) {
 void shutdown_server(rep_value_t* rep_value) {
 
 }
+*/
 
 int validate_user(req_header_t *header, rep_header_t* rep_header) {
    if (is_admin(header->account_id)) {
