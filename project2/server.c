@@ -21,15 +21,18 @@ int main(int argc, char *argv[]) {
    //while(1)
    server_connect_user(&fifo_server, &fifo_user);
 
-   char ola[4];
-   while(!readline(fifo_server, ola)) {
+   char test[4];
+   while(!readline(fifo_server, test)) {
       sleep(1);
-      printf("stuck\n");
+      printf("stuck in readline\n");
    }
-   printf("%s\n", ola);
+   printf("%s\n", test);
 
    tlv_request_t req;
-   while(!read_request(fifo_server, &req)) sleep(1);
+   while(!read_request(fifo_server, &req)) {
+      sleep(1);
+      printf("stuck in read_request\n");
+   }
 
    return 0;
 }
@@ -179,7 +182,7 @@ int read_request(int fd, tlv_request_t* req) {
 
    // reads pointer
    n = read(fd, req, 1);
-   if (n != 0)
+   if (n > 0)
       printf("type: %d\tlenght: %d\tvalue: PID: %d\n", req->type, req->length, req->value.header.pid);
 
    return (n>0);

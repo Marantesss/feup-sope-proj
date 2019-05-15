@@ -7,8 +7,7 @@ int main() {
 
    user_connect_server(&fifo_server, &fifo_user);
 
-   sleep(4);
-   write(fifo_server, "ola", 4);
+   write(fifo_server, "ola", strlen("ola") + 1);
 
    tlv_request_t req;
    create_request(&req);
@@ -40,8 +39,7 @@ void user_connect_server(int* fifo_server, int* fifo_user) {
    char user_fifo_path[USER_FIFO_PATH_LEN];
    get_user_fifo_path(user_fifo_path);
    // sends user information to server
-   printf("\n\nSERVER: %d\n\n", *fifo_server);
-   write(*fifo_server, user_fifo_path, USER_FIFO_PATH_LEN);
+   write(*fifo_server, user_fifo_path, strlen(user_fifo_path) + 1);
    // wait for user fifo to be created
    while(access(user_fifo_path, F_OK)) sleep(1);
    // opening user fifo - waits for server to connect to user
