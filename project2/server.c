@@ -12,12 +12,18 @@ int main(int argc, char *argv[]) {
       exit(EXIT_FAILURE);
    }
 
+   num_threads = min(atoi(argv[1]), 10);
+
    create_admin_account(&accounts[0], argv[2]);
 
    server_fifo_create(&fifo_server);
 
-   while(1)
-      server_connect_user(&fifo_server, &fifo_user);
+   //while(1)
+   server_connect_user(&fifo_server, &fifo_user);
+
+
+   tlv_request_t req;
+   while(!read_request(fifo_server, &req)) sleep(1);
 
    return 0;
 }
@@ -160,4 +166,15 @@ int readline(int fd, char *str) {
    } while (n > 0 && *str++ != '\0');
 
    return (n>0); 
+}
+
+int read_request(int fd, tlv_request_t* req) {
+   int n;
+
+   // reads pointer
+   n = read(fd, req, 1);
+   if (n != 0)
+      printf("type: %d\tlenght: %d\tvalue: PID: %d\n", req->type, req->length, req->value.header.pid);
+
+   return (n>0);
 }

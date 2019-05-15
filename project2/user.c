@@ -7,6 +7,10 @@ int main() {
 
    user_connect_server(&fifo_user, &fifo_server);
 
+   tlv_request_t req;
+   create_request(&req);
+   write(fifo_server, &req, 1);
+
    return 0;
 }
 
@@ -53,4 +57,19 @@ int readline(int fd, char *str) {
    } while (n>0 && *str++ != '\0');
 
    return (n>0); 
+}
+
+void create_request(tlv_request_t* req) {
+   // type
+   req->type = OP_CREATE_ACCOUNT;
+   // length
+   req->length = 20;
+   // value
+   req->value.header.account_id = 1;
+   req->value.header.op_delay_ms = 10;
+   strcpy(req->value.header.password,"ola");
+   req->value.header.pid = getpid();
+   req->value.create.account_id = 2;
+   req->value.create.balance = 100;
+   strcpy(req->value.create.password, "ola");
 }
