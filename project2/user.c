@@ -5,11 +5,15 @@ int main() {
 
    int fifo_user, fifo_server;
 
-   user_connect_server(&fifo_user, &fifo_server);
+   user_connect_server(&fifo_server, &fifo_user);
+
+   sleep(4);
+   write(fifo_server, "ola", 4);
 
    tlv_request_t req;
    create_request(&req);
    write(fifo_server, &req, 1);
+   printf("req: %ld\t&req: %ld\n", sizeof(req), sizeof(&req));
 
    return 0;
 }
@@ -28,7 +32,7 @@ void user_connect_server(int* fifo_server, int* fifo_user) {
    *fifo_server = open(SERVER_FIFO_PATH, O_WRONLY | O_NONBLOCK); // | O_NONBLOCK makes so that it does not block
    if (*fifo_server == -1) {
       printf("\nfifo_server: Open attempt failed.\n");
-      exit(RC_SRV_DOWN); 
+      exit(-1); 
    }
 
    // ---- opening user fifo - waits for server to create fifo and connect to user
@@ -36,6 +40,7 @@ void user_connect_server(int* fifo_server, int* fifo_user) {
    char user_fifo_path[USER_FIFO_PATH_LEN];
    get_user_fifo_path(user_fifo_path);
    // sends user information to server
+   printf("\n\nSERVER: %d\n\n", *fifo_server);
    write(*fifo_server, user_fifo_path, USER_FIFO_PATH_LEN);
    // wait for user fifo to be created
    while(access(user_fifo_path, F_OK)) sleep(1);
@@ -43,7 +48,7 @@ void user_connect_server(int* fifo_server, int* fifo_user) {
    *fifo_user = open(user_fifo_path, O_RDONLY);
    if (*fifo_user == -1) {
       printf("\nfifo_user: Open attempt failed\n");
-      exit(RC_USR_DOWN);
+      exit(-1);
    }
 
    printf("\nChannels opened.\nUser %d connected to server.\n", getpid());

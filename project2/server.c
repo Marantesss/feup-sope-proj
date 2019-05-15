@@ -21,6 +21,12 @@ int main(int argc, char *argv[]) {
    //while(1)
    server_connect_user(&fifo_server, &fifo_user);
 
+   char ola[4];
+   while(!readline(fifo_server, ola)) {
+      sleep(1);
+      printf("stuck\n");
+   }
+   printf("%s\n", ola);
 
    tlv_request_t req;
    while(!read_request(fifo_server, &req)) sleep(1);
