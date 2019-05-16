@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "queue.h"
 
 /**
  * 
@@ -9,6 +10,11 @@ bank_account_t accounts[MAX_BANK_ACCOUNTS];
  * 
  */
 int num_threads;
+
+/**
+ * 
+ */
+Queue queue;
 
 /**
  * 
@@ -52,8 +58,8 @@ void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* re
 
 /**
  * 
-void shutdown_server(rep_value_t* rep_value);
  */
+void shutdown_server(rep_value_t* rep_value, int *fifo);
 
 /**
  * 
