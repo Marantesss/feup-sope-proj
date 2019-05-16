@@ -174,11 +174,15 @@ void create_user_account(req_create_account_t* create, rep_value_t* rep_value) {
    printf("\nUSER ACCOUNT CREATED.\n");
 }
 
-/*
 void check_user_balance(uint32_t id, rep_value_t* rep_value) {
-   
+   printf("CHECKING USER BALANCE...");
+
+   rep_value->transfer.balance = accounts[id].balance;
+
+   printf("\nUSER BALANCE CHECKED - %d\n", accounts[id].balance);
 }
 
+/*
 void create_user_transfer(req_transfer_t* transfer, rep_value_t* rep_value) {
 
 }
@@ -188,17 +192,31 @@ void shutdown_server(rep_value_t* rep_value) {
 }
 */
 
-int validate_user(req_header_t *header, rep_header_t* rep_header) {
-   if (is_admin(header->account_id)) {
-      rep_header->ret_code = RC_OP_NALLOW;
+int validate_user(req_header_t *req_header, rep_header_t* reply_header) {
+   // ---- check id
+   // check if not admin (id != 0)
+   if (is_admin(req_header->account_id)) {
+      reply_header->ret_code = RC_OP_NALLOW;
       return 0;
    }
-   char req_hash[HASH_LEN + 1];
-   // TODO make req_hash with sha256sum
+   // check if id is between 1 and 4096
+   if (!between(1, req_header->account_id, MAX_BANK_ACCOUNTS)) {
+      printf("ERROR: Invalid ID - too small or too big\n");
+      reply_header->ret_code = RC_OTHER;
+      return 0;
+   }
+   // check if id in use
+   if (req_header->account_id != accounts[req_header->account_id].account_id) {
+      printf("ERROR: Invalid ID - id does not exist\n");
+      reply_header->ret_code = RC_ID_NOT_FOUND;
+      return 0;
+   }
+   // ---- check password
+   char req_hash[MAX_PASSWORD_LEN + SALT_LEN + 1];
    char command[] = "echo -n \"";
 
-   strcat(command, header->password);
-   strcat(command, accounts[header->account_id].salt);
+   strcat(command, req_header->password);
+   strcat(command, accounts[req_header->account_id].salt);
    strcat(command, "\" | sha256sum");
 
    FILE *f = popen(command, "r");
@@ -213,28 +231,29 @@ int validate_user(req_header_t *header, rep_header_t* rep_header) {
 
    strcpy(req_hash, strtok(hash, " "));
 
-   if (strcmp(req_hash, accounts[header->account_id].hash)) {
-      rep_header->ret_code = RC_LOGIN_FAIL;
+   if (strcmp(req_hash, accounts[req_header->account_id].hash)) {
+      reply_header->ret_code = RC_LOGIN_FAIL;
       return 0;
    }
    else {
-      rep_header->ret_code = RC_OK;
+      reply_header->ret_code = RC_OK;
       return 1;
    }
 }
 
-int validate_admin(req_header_t *header, rep_header_t* rep_header) {
-   if (!(is_admin(header->account_id))) {
-      rep_header->ret_code = RC_OP_NALLOW;
+int validate_admin(req_header_t *req_header, rep_header_t* reply_header) {
+   // ---- check if admin (id = 0)
+   if (!(is_admin(req_header->account_id))) {
+      reply_header->ret_code = RC_OP_NALLOW;
       return 0;
    }
-   char req_hash[HASH_LEN + 1];
-   strcpy(req_hash, strcat(header->password, accounts[header->account_id].salt));
-   // TODO make req_hash with sha256sum
+   // ---- check password
+   char req_hash[MAX_PASSWORD_LEN + SALT_LEN + 1];
+   strcpy(req_hash, strcat(req_header->password, accounts[req_header->account_id].salt));
    char command[] = "echo -n \"";
 
-   strcat(command, header->password);
-   strcat(command, accounts[header->account_id].salt);
+   strcat(command, req_header->password);
+   strcat(command, accounts[req_header->account_id].salt);
    strcat(command, "\" | sha256sum");
 
    FILE *f = popen(command, "r");
@@ -249,12 +268,12 @@ int validate_admin(req_header_t *header, rep_header_t* rep_header) {
 
    strcpy(req_hash, strtok(hash, " "));
    
-   if (strcmp(req_hash, accounts[header->account_id].hash)) {
-      rep_header->ret_code = RC_LOGIN_FAIL;
+   if (strcmp(req_hash, accounts[req_header->account_id].hash)) {
+      reply_header->ret_code = RC_LOGIN_FAIL;
       return 0;
    }
    else {
-      rep_header->ret_code = RC_OK;
+      reply_header->ret_code = RC_OK;
       return 1;
    }
 }
