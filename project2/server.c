@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
 }
 
 static char *rand_string(char *str, size_t size) {
-   const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJK...";
+   const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
    if (size) {
      --size;
       for (size_t n = 0; n < size; n++) {
