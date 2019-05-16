@@ -179,9 +179,41 @@ void check_user_balance(uint32_t id, rep_value_t* rep_value) {
    
 }
 
-void create_user_transfer(req_transfer_t* transfer, rep_value_t* rep_value) {
+*/
+
+void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* rep_value) {
+   printf("CREATING USER TRANSFER...");
+   // ---- checking if account credentials are valid
+   // checking id
+   if (!between(1, transfer->account_id, MAX_BANK_ACCOUNTS)) {
+      printf("ERROR: Invalid ID - too small or too big\n");
+      rep_value->header.ret_code = RC_OTHER;
+      return;
+   }
+   if (transfer->account_id != accounts[transfer->account_id].account_id) {
+      printf("ERROR: Invalid ID - id does not exist\n");
+      rep_value->header.ret_code = RC_ID_IN_USE;
+      return;
+   }
+   // checking funds
+   if (!between(MIN_BALANCE, transfer->amount, accounts[id].balance)) {
+      printf("ERROR: Invalid transfer amount - not enough funds from sender\n");
+      rep_value->header.ret_code = RC_NO_FUNDS;
+      return;
+   }
+   if (!between(MIN_BALANCE, transfer->amount + accounts[transfer->account_id].balance, MAX_BALANCE)) {
+      printf("ERROR: Invalid transfer amount - too much funds from receiver\n");
+      rep_value->header.ret_code = RC_NO_FUNDS;
+      return;
+   }
+
+   accounts[id].balance -= transfer->amount;
+   accounts[transfer->account_id].balance += transfer->amount;
+   rep_value->header.ret_code = RC_OK;
 
 }
+
+/*
 
 void shutdown_server(rep_value_t* rep_value) {
 
