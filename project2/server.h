@@ -14,7 +14,7 @@ int num_threads;
 /**
  * 
  */
-Queue queue;
+queue_t request_queue;
 
 /**
  * 

@@ -2,7 +2,7 @@
 
 typedef struct node {
 	tlv_request_t req;
-	node_t *next;
+	struct node *next;
 } node_t;
  
 typedef struct queue {
@@ -13,8 +13,10 @@ typedef struct queue {
  
 void init(queue_t *q);
 
-int front(queue_t *q);
+tlv_request_t front(queue_t *q);
 
 void pop(queue_t *q);
 
 void push(queue_t *q, tlv_request_t req);
+
+int empty(queue_t *q);

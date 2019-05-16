@@ -1,9 +1,10 @@
 #include "server.h"
 
 int main(int argc, char *argv[]) {
+   int fifo_request;
+
    setbuf(stdout, NULL); // prints stuff without needing \n
    
-   int fifo_request, fifo_reply;
 
    printf("WARNING: No verifications are being made to command arguments!!!\n");
 
@@ -11,9 +12,6 @@ int main(int argc, char *argv[]) {
       printf("Too few arguments\n");
       exit(EXIT_FAILURE);
    }
-
-   // maybe not necessary
-   //memset(accounts, 0, MAX_BANK_ACCOUNTS*sizeof(bank_account_t));
    
    num_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
 
@@ -21,6 +19,7 @@ int main(int argc, char *argv[]) {
    create_admin_account(argv[2]);
 
    // ---- create server/request fifo
+   int fifo_reply;
    server_fifo_create(&fifo_reply);
 
    // ---- getting request from user
@@ -30,10 +29,13 @@ int main(int argc, char *argv[]) {
       sleep(1);
       printf("stuck in read_request\n");
    }
+
+   // ---- main thread should take care of shutdown requests
    if (req.type == OP_SHUTDOWN) {
       //shutdown_server();
    }
-   // ---- getting reply from server
+
+   // ---- process request
    tlv_reply_t reply;
    usleep(req.value.header.op_delay_ms);
    acknowledge_request(&req, &reply);
@@ -74,10 +76,10 @@ void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply) {
             create_user_account(&req->value.create, &reply->value);
             break;
          case OP_BALANCE:
-            //check_user_balance(req->value.header.account_id, &reply->value);
+            check_user_balance(req->value.header.account_id, &reply->value);
             break;
          case OP_TRANSFER:
-            //create_user_transfer(&req->value.transfer, &reply->value);
+            create_user_transfer(req->value.header.account_id, &req->value.transfer, &reply->value);
             break;
          case OP_SHUTDOWN:
             //shutdown_server(&reply->value);
@@ -190,8 +192,8 @@ void check_user_balance(uint32_t id, rep_value_t* rep_value) {
 
 void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* rep_value) {
    printf("CREATING USER TRANSFER...");
-   // ---- checking if account credentials are valid
    rep_value->transfer.balance = accounts[transfer->account_id].balance; 
+   // ---- checking if account credentials are valid
    // checking id
    if (!between(1, transfer->account_id, MAX_BANK_ACCOUNTS)) {
       printf("ERROR: Invalid ID - too small or too big\n");
@@ -222,10 +224,11 @@ void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* re
 
 }
 
+/*
 void shutdown_server(rep_value_t* rep_value, int *fifo) {
    fchmod(fifo, 0444);
 }
-
+*/
 
 int validate_user(req_header_t *req_header, rep_header_t* reply_header) {
    // ---- check id
