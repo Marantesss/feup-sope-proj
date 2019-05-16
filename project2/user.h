@@ -28,6 +28,11 @@ int read_reply(int fd, tlv_reply_t* reply);
 /**
  * 
  */
+int print_reply(tlv_reply_t* reply);
+
+/**
+ * 
+ */
 int readline(int fd, char *str);
 
 /**
