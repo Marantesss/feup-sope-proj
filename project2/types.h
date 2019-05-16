@@ -126,7 +126,8 @@ typedef struct tlv_request {
  */
 typedef struct rep_header {
   uint32_t account_id;
-  int ret_code;
+  //int ret_code;  // replaced
+  ret_code_t ret_code;
 } __attribute__((packed)) rep_header_t;
 
 /**

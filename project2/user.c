@@ -1,41 +1,88 @@
-#include "utils.h"
+#include "user.h"
 
-tlv_request_t *request = NULL;
+int main(int argc, char *argv[]) {
+   tlv_request_t request;
+   tlv_reply_t reply;
+   int fifo_reply, fifo_request;
 
-int main(int argc, char *argv[], char *envp[])
-{
-   int arg_receiver, id_op;
-   char *token;
+   setbuf(stdout, NULL); // prints stuff without needing \n
 
    // ---- checking the minimum ammount of argumrnts
-   if (argc < 6){
+   if (argc < 6) {
       printf("Error: Too few arguments\n");
       printf("Usage: %s [account-id] [\"password\"] [delay-in-ms] [operation-id] [\"[]/[acc-id amount]/[acc-id balance password]\"]\n", argv[0]);
       exit(EXIT_FAILURE);
    }
    // ---- checking the maximum ammount of arguments
-   if (argc > 6){
+   if (argc > 6) {
       printf("Error: Too many arguments\n");
       printf("Usage: %s [account-id] [\"password\"] [delay-in-ms] [operation-id] [\"[]/[acc-id amount]/[acc-id balance password]\"]\n", argv[0]);
       exit(EXIT_FAILURE);
    }
 
-   request = calloc(1, sizeof(tlv_request_t));
+   // ---- connect to server/request fifo
+   user_connect_server(&fifo_request);
 
-   setbuf(stdout, NULL); // prints stuff without needing \n
+   // ---- get request
+   get_request(argv, &request);
 
-   int fifo_user, fifo_server;
+   // ---- write request
+   write(fifo_request, &request, sizeof(tlv_request_t));
 
-   user_connect_server(&fifo_server, &fifo_user);
+   // ---- connect to user/reply fifo
+   user_connect_fifo_reply(&fifo_reply);
 
-   write(fifo_server, "ola", strlen("ola") + 1);
+   // ---- read reply
+   read_reply(fifo_reply, &reply);
 
-   tlv_request_t req;
-   create_request(&req);
+   // ---- TODO: Print reply (Reply may not be successfull - show errors with return code)
+   
+   return 0;
+}
 
-   write(fifo_server, &req, sizeof(tlv_request_t));
+void user_connect_server(int* fifo_request) {
+   printf("Opening Server/Request FIFO communication channel...");
 
-   //------------parsing arguments------------
+   // ---- opening server fifo - does not wait for server
+   *fifo_request = open(SERVER_FIFO_PATH, O_WRONLY | O_NONBLOCK); // | O_NONBLOCK makes so that it does not block
+   if (*fifo_request == -1) {
+      printf("\nfifo_server: Open attempt failed.\n");
+      exit(-1);
+   }
+
+   printf("\nChannel opened.\nUser %d connected to server.\n", getpid());
+}
+
+void user_connect_fifo_reply(int* fifo_reply) {
+   printf("Opening User/Reply FIFO communication channel...");
+
+   // ---- opening user fifo - waits for server to create fifo and connect to user
+   // get user fifo path name
+   char user_fifo_path[USER_FIFO_PATH_LEN];
+   get_user_fifo_path(user_fifo_path);
+   // wait for user fifo to be created
+   while(access(user_fifo_path, F_OK)) sleep(1);
+   // opening user fifo - waits for server to connect to user
+   *fifo_reply = open(user_fifo_path, O_RDONLY);
+   if (*fifo_reply == -1) {
+      printf("\nfifo_user: Open attempt failed\n");
+      exit(-1);
+   }
+
+   printf("\nChannel opened.\n");
+
+}
+
+void get_user_fifo_path(char* user_fifo_path) {
+   strcpy(user_fifo_path, USER_FIFO_PATH_PREFIX);
+   char user_fifo_path_sufix[WIDTH_ID + 1];
+   sprintf(user_fifo_path_sufix, "%d", getpid());
+   strcat(user_fifo_path, user_fifo_path_sufix);
+}
+
+void get_request(char *argv[], tlv_request_t* request) {
+   int arg_receiver, id_op;
+   char *token;
 
    // **** id da conta
    arg_receiver = atoi(argv[1]);
@@ -48,13 +95,16 @@ int main(int argc, char *argv[], char *envp[])
    arg_receiver = atoi(argv[3]);
    request->value.header.op_delay_ms = arg_receiver;
 
+   // **** process id
+   request->value.header.pid = getpid();
+
    // **** id da operação e "argumentos extra" aka argv[5]
    id_op = atoi(argv[4]);
    switch (id_op){
    case 0: //create account
       request->type = OP_CREATE_ACCOUNT;
-
       token = strtok(argv[5], " ");
+      
       int account_created = atoi(token);
       request->value.create.account_id = account_created;
 
@@ -87,6 +137,7 @@ int main(int argc, char *argv[], char *envp[])
    default:
       break;
    }
+<<<<<<< HEAD
 
    // **** adicionar length
    request->length = sizeof(request->value);
@@ -99,34 +150,17 @@ void get_user_fifo_path(char* user_fifo_path) {
    char user_fifo_path_sufix[WIDTH_ID + 1];
    sprintf(user_fifo_path_sufix, "%d", getpid());
    strcat(user_fifo_path, user_fifo_path_sufix);
+=======
+>>>>>>> ea86fa6eb4eab41497657c406f8d8b856cc83d79
 }
 
-void user_connect_server(int* fifo_server, int* fifo_user) {
-   printf("Opening FIFO communication channels...");
+int read_reply(int fd, tlv_reply_t* reply) {
+   int n;
 
-   // ---- opening server fifo - does not wait for server
-   *fifo_server = open(SERVER_FIFO_PATH, O_WRONLY | O_NONBLOCK); // | O_NONBLOCK makes so that it does not block
-   if (*fifo_server == -1) {
-      printf("\nfifo_server: Open attempt failed.\n");
-      exit(-1);
-   }
+   // reads pointer
+   n = read(fd, reply, sizeof(tlv_reply_t));
 
-   // ---- opening user fifo - waits for server to create fifo and connect to user
-   // get user fifo path name
-   char user_fifo_path[USER_FIFO_PATH_LEN];
-   get_user_fifo_path(user_fifo_path);
-   // sends user information to server
-   write(*fifo_server, user_fifo_path, strlen(user_fifo_path) + 1);
-   // wait for user fifo to be created
-   while(access(user_fifo_path, F_OK)) sleep(1);
-   // opening user fifo - waits for server to connect to user
-   *fifo_user = open(user_fifo_path, O_RDONLY);
-   if (*fifo_user == -1) {
-      printf("\nfifo_user: Open attempt failed\n");
-      exit(-1);
-   }
-
-   printf("\nChannels opened.\nUser %d connected to server.\n", getpid());
+   return (n>0);
 }
 
 int readline(int fd, char *str) {
@@ -139,28 +173,21 @@ int readline(int fd, char *str) {
    return (n>0);
 }
 
-void create_request(tlv_request_t* req) {
-   // type
-   req->type = OP_CREATE_ACCOUNT;
-   // length
-   req->length = 20;
-   // value
-   req->value.header.account_id = 1;
-   req->value.header.op_delay_ms = 10;
-   strcpy(req->value.header.password,"ola");
-   req->value.header.pid = getpid();
-   req->value.create.account_id = 2;
-   req->value.create.balance = 100;
-   strcpy(req->value.create.password, "ola");
+/*
+void create_test_request(tlv_request_t* req) {
+   // ---- type
+   req.type = OP_CREATE_ACCOUNT;
+   // ---- value
+   // header
+   req.value.header.account_id = 0;
+   req.value.header.op_delay_ms = 10;
+   strcpy(req.value.header.password,"olaolaol");
+   req.value.header.pid = getpid();
+   // create
+   req.value.create.account_id = 2;
+   req.value.create.balance = 100;
+   strcpy(req.value.create.password, "ola");
+   // ---- length
+   req.length = sizeof(req.value);
 }
-
-int read_reply(int fd, tlv_request_t* req) {
-   int n;
-
-   // reads pointer
-   n = read(fd, req, 1);
-   if (n > 0)
-      printf("type: %d\tlenght: %d\tvalue: PID: %d\n", req->type, req->length, req->value.header.pid);
-
-   return (n>0);
-}
+*/
