@@ -171,10 +171,10 @@ void create_user_account(req_create_account_t* create, rep_value_t* rep_value) {
    // generate random salt
    char salt[SALT_LEN + 1];
    
-   strcpy(salt, rand_string(salt, 64));
+   rand_string(salt, SALT_LEN);
    strcpy(accounts[create->account_id].salt, salt);
    // generate hash
-   char command[] = "echo -n ";
+   char command[MAX_PASSWORD_LEN + SALT_LEN + 24] = "echo -n ";
 
    strcat(command, create->password);
    strcat(command, salt);
@@ -240,6 +240,7 @@ void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* re
    rep_value->header.ret_code = RC_OK;
    rep_value->transfer.balance = accounts[transfer->account_id].balance;
 
+   printf("\nUSER TRANSFER CREATED.\n");
 }
 
 /*
@@ -269,7 +270,7 @@ int validate_user(req_header_t *req_header, rep_header_t* reply_header) {
    }
    // ---- check password
    char req_hash[MAX_PASSWORD_LEN + SALT_LEN + 1];
-   char command[] = "echo -n \"";
+   char command[MAX_PASSWORD_LEN + SALT_LEN + 24] = "echo -n \"";
 
    strcat(command, req_header->password);
    strcat(command, accounts[req_header->account_id].salt);
@@ -305,8 +306,8 @@ int validate_admin(req_header_t *req_header, rep_header_t* reply_header) {
    }
    // ---- check password
    char req_hash[MAX_PASSWORD_LEN + SALT_LEN + 1];
-   strcpy(req_hash, strcat(req_header->password, accounts[req_header->account_id].salt));
-   char command[] = "echo -n \"";
+   //strcpy(req_hash, strcat(req_header->password, accounts[req_header->account_id].salt));
+   char command[MAX_PASSWORD_LEN + SALT_LEN + 24] = "echo -n \"";
 
    strcat(command, req_header->password);
    strcat(command, accounts[req_header->account_id].salt);
@@ -354,10 +355,10 @@ void create_admin_account(char* password) {
    // TODO generate random salt
    char salt[SALT_LEN + 1];
    
-   strcpy(salt, rand_string(salt, 64));
+   rand_string(salt, SALT_LEN);
    strcpy(accounts[ADMIN_ACCOUNT_ID].salt, salt);
    // TODO generate hash
-   char command[] = "echo -n \"";
+   char command[MAX_PASSWORD_LEN + SALT_LEN + 24] = "echo -n \"";
 
    strcat(command, password);
    strcat(command, salt);
