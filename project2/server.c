@@ -30,7 +30,9 @@ int main(int argc, char *argv[]) {
       sleep(1);
       printf("stuck in read_request\n");
    }
-
+   if (req.type == OP_SHUTDOWN) {
+      //shutdown_server();
+   }
    // ---- getting reply from server
    tlv_reply_t reply;
    usleep(req.value.header.op_delay_ms);
