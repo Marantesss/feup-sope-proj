@@ -171,6 +171,8 @@ void create_user_account(req_create_account_t* create, rep_value_t* rep_value) {
 
    strcpy(accounts[create->account_id].hash, hash);
 
+   rep_value->header.ret_code = RC_OK;
+
    printf("\nUSER ACCOUNT CREATED.\n");
 }
 
