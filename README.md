@@ -25,3 +25,9 @@ A parte de programação do trabalho consiste na escrita de um utilitário de an
 Tal utilitário deve ser capaz de percorrer um sistema de ficheiros, recolhendo ou criando informação sobre os ficheiros encontrados, e apresentando-a num formato especificado. O utilizador escolhe o diretório de partida (ou, até, um simples ficheiro), o local onde a informação colecionada é colocada (saída padrão ou ficheiro) e a geração de registos de execução (logs). Adicionalmente, o utilitário deve lidar com a possibilidade de interrupção de execução, a comando do utilizador.
 
 A estrutura do programa é deixada ao critério do projetista, mas exige-se o cumprimento de certos requisitos, apresentados mais à frente.
+
+# Project 2
+
+## General Description
+
+Pretende-se desenvolver uma aplicação cliente/servidor que permita simular a realização de operações bancárias através da Internet (home banking). A simulação será feita através de processos a correr num único computador, sendo a comunicação entre clientes e servidor feita através de pipes com nome (FIFOs).

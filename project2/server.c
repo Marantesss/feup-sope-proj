@@ -375,8 +375,6 @@ int read_request(int fd, tlv_request_t* req) {
 
    // reads pointer
    n = read(fd, req, sizeof(tlv_request_t));
-   if (n > 0)
-      printf("type: %d\tlenght: %d\tvalue: PID: %d\n", req->type, req->length, req->value.header.pid);
-
+   
    return (n>0);
 }
