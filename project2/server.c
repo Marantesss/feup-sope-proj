@@ -33,6 +33,7 @@ int main(int argc, char *argv[]) {
 
    // ---- getting reply from server
    tlv_reply_t reply;
+   usleep(req.value.header.op_delay_ms);
    acknowledge_request(&req, &reply);
 
    // ---- create user fifo
