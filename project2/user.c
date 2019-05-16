@@ -5,17 +5,19 @@ int main() {
 
    int fifo_user, fifo_server;
 
-   user_connect_server(&fifo_server, &fifo_user);
+   // ---- connect to server/request fifo
+   user_connect_server(&fifo_server);
 
-   write(fifo_server, "ola", strlen("ola") + 1);
-
+   // ---- write request
    tlv_request_t req;
    create_request(&req);
-
    write(fifo_server, &req, sizeof(tlv_request_t));
-   
-   printf("req: %ld\t&req: %ld\n", sizeof(req), sizeof(&req));
 
+   // ---- connect to reply/user fifo
+   user_connect_user_fifo(&fifo_user);
+
+   // ---- read reply
+   
    return 0;
 }
 
@@ -26,7 +28,7 @@ void get_user_fifo_path(char* user_fifo_path) {
    strcat(user_fifo_path, user_fifo_path_sufix);
 }
 
-void user_connect_server(int* fifo_server, int* fifo_user) {
+void user_connect_server(int* fifo_server) {
    printf("Opening FIFO communication channels...");
 
    // ---- opening server fifo - does not wait for server
@@ -36,12 +38,14 @@ void user_connect_server(int* fifo_server, int* fifo_user) {
       exit(-1); 
    }
 
+   printf("\nChannels opened.\nUser %d connected to server.\n", getpid());
+}
+
+void user_connect_user_fifo(int* fifo_user) {
    // ---- opening user fifo - waits for server to create fifo and connect to user
    // get user fifo path name 
    char user_fifo_path[USER_FIFO_PATH_LEN];
    get_user_fifo_path(user_fifo_path);
-   // sends user information to server
-   write(*fifo_server, user_fifo_path, strlen(user_fifo_path) + 1);
    // wait for user fifo to be created
    while(access(user_fifo_path, F_OK)) sleep(1);
    // opening user fifo - waits for server to connect to user
@@ -50,8 +54,6 @@ void user_connect_server(int* fifo_server, int* fifo_user) {
       printf("\nfifo_user: Open attempt failed\n");
       exit(-1);
    }
-
-   printf("\nChannels opened.\nUser %d connected to server.\n", getpid());
 }
 
 int readline(int fd, char *str) {
