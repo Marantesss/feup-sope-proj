@@ -189,6 +189,7 @@ void check_user_balance(uint32_t id, rep_value_t* rep_value) {
 void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* rep_value) {
    printf("CREATING USER TRANSFER...");
    // ---- checking if account credentials are valid
+   rep_value->transfer.balance = accounts[transfer->account_id].balance; 
    // checking id
    if (!between(1, transfer->account_id, MAX_BANK_ACCOUNTS)) {
       printf("ERROR: Invalid ID - too small or too big\n");
@@ -215,6 +216,7 @@ void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* re
    accounts[id].balance -= transfer->amount;
    accounts[transfer->account_id].balance += transfer->amount;
    rep_value->header.ret_code = RC_OK;
+   rep_value->transfer.balance = accounts[transfer->account_id].balance;
 
 }
 
