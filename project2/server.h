@@ -1,3 +1,6 @@
+#ifndef SERVER_H
+#define SERVER_H
+
 #include "utils.h"
 #include "queue.h"
 
@@ -15,6 +18,11 @@ int num_threads;
  * 
  */
 queue_t request_queue;
+
+/**
+ * 
+ */
+void acknowledge_re(tlv_request_t *req, tlv_reply_t *reply);
 
 /**
  * 
@@ -80,3 +88,5 @@ int readline(int fd, char *str);
  * 
  */
 int read_request(int fd, tlv_request_t* req);
+
+#endif

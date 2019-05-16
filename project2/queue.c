@@ -22,12 +22,12 @@ void push(queue_t *q, tlv_request_t req) {
 	q->size++;
  
 	if (q->front == NULL) {
-		q->front = (struct Node *) malloc(sizeof(node_t));
+		q->front = (node_t *) malloc(sizeof(node_t));
 		q->front->req = req;
 		q->front->next = NULL;
 		q->last = q->front;
 	} else {
-		q->last->next = (struct Node *) malloc(sizeof(node_t));
+		q->last->next = (node_t *) malloc(sizeof(node_t));
 		q->last->next->req = req;
 		q->last->next->next = NULL;
 		q->last = q->last->next;

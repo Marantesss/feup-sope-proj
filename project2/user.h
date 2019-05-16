@@ -1,3 +1,6 @@
+#ifndef USER_H
+#define USER_H
+
 #include "utils.h"
 
 /**
@@ -34,3 +37,5 @@ int readline(int fd, char *str);
  * TO DELETE
  */
 void create_test_request(tlv_request_t* req);
+
+#endif

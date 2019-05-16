@@ -1,3 +1,6 @@
+#ifndef QUEUE_H
+#define QUEUE_H
+
 #include "utils.h"
 
 typedef struct node {
@@ -20,3 +23,5 @@ void pop(queue_t *q);
 void push(queue_t *q, tlv_request_t req);
 
 int empty(queue_t *q);
+
+#endif

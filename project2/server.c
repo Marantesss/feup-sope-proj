@@ -15,6 +15,9 @@ int main(int argc, char *argv[]) {
    
    num_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
 
+   // ---- init request queue
+   init(&request_queue);
+
    // ---- create admin account
    create_admin_account(argv[2]);
 
@@ -35,16 +38,29 @@ int main(int argc, char *argv[]) {
       //shutdown_server();
    }
 
-   // ---- process request
-   tlv_reply_t reply;
-   usleep(req.value.header.op_delay_ms);
-   acknowledge_request(&req, &reply);
+   // ---- enqueue the request
+   push(&request_queue, req);
 
-   // ---- create user fifo
-   user_fifo_create(&fifo_request, req.value.header.pid);
 
-   // ---- write reply
-   write(fifo_request, &reply, sizeof(tlv_reply_t));
+   // (thread function)
+   //while (!empty(&request_queue)) {
+      tlv_reply_t reply;
+      // ---- get next request
+      tlv_request_t next_request = front(&request_queue);
+      // ---- dequeue the request
+      pop(&request_queue);
+
+      // ---- process request
+      acknowledge_request(&next_request, &reply);
+
+      // ---- create user fifo
+      user_fifo_create(&fifo_request, next_request.value.header.pid);
+
+      // ---- write reply
+      write(fifo_request, &reply, sizeof(tlv_reply_t));
+
+
+   //}
 
    return 0;
 }
@@ -63,6 +79,8 @@ static char *rand_string(char *str, size_t size) {
 }
 
 void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply) {
+   // ---- wait for request's delay time
+   usleep(req->value.header.op_delay_ms);
    // ---- reply type
    reply->type = req->type;
 

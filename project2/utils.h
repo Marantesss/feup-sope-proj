@@ -1,3 +1,6 @@
+#ifndef UTILS_H
+#define UTILS_H
+
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -20,3 +23,5 @@
  * 
  */
 #define is_admin(id) id == 0 ? 1 : 0
+
+#endif

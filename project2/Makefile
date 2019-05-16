@@ -1,13 +1,16 @@
 CC=gcc
 CFLAGS=-Wall -Wextra -Werror -pedantic -lpthread
 
-all: user server #log
+all: queue user server
+
+queue: queue.c
+	$(CC) $(CFLAGS) -c -o queue.o queue.c
 
 user: user.c
 	$(CC) $(CFLAGS) -o user.o user.c
 
 server: server.c
-	$(CC) $(CFLAGS) -o server.o server.c
+	$(CC) $(CFLAGS) -o server.o server.c queue.o
 
 #log: log
 #	$(CC) $(CFLAGS) -o log.o log.c
