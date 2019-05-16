@@ -102,7 +102,7 @@ int validate_request(tlv_request_t *req, tlv_reply_t *reply) {
          break;
       default:
          printf("ERROR: Invalid Operation\n");
-         return RC_OTHER;
+         return 0;
    }
 
    return 0;
@@ -178,6 +178,7 @@ void check_user_balance(uint32_t id, rep_value_t* rep_value) {
    printf("CHECKING USER BALANCE...");
 
    rep_value->transfer.balance = accounts[id].balance;
+   rep_value->header.ret_code = RC_OK;
 
    printf("\nUSER BALANCE CHECKED - %d\n", accounts[id].balance);
 }
