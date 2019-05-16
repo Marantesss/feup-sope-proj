@@ -213,12 +213,10 @@ void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* re
 
 }
 
-/*
-
 void shutdown_server(rep_value_t* rep_value) {
 
 }
-*/
+
 
 int validate_user(req_header_t *header, rep_header_t* rep_header) {
    if (is_admin(header->account_id)) {
