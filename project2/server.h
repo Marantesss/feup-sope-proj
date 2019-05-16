@@ -42,18 +42,18 @@ void create_user_account(req_create_account_t* create, rep_value_t* rep_value);
 
 /**
  * 
- */
+ *
 void check_user_balance(uint32_t id, rep_value_t* rep_value);
 
-/**
+**
  * 
- */
+ *
 void create_user_transfer(req_transfer_t* transfer, rep_value_t* rep_value);
 
-/**
+**
  * 
- */
 void shutdown_server(rep_value_t* rep_value);
+ */
 
 /**
  * 
@@ -63,12 +63,7 @@ void server_fifo_create(int* fifo_server);
 /**
  * 
  */
-void server_connect_user(int* fifo_server, int* fifo_user);
-
-/**
- * 
- */
-void user_fifo_create(char* user_fifo_path);
+void user_fifo_create(int* fifo_user, pid_t pid);
 
 /**
  * 

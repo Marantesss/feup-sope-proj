@@ -17,14 +17,14 @@ int main(int argc, char *argv[]) {
    
    num_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
 
+   // ---- create admin account
    create_admin_account(argv[2]);
 
+   // ---- create server/request fifo
    server_fifo_create(&fifo_server);
 
-   //while(1)
-   server_connect_user(&fifo_server, &fifo_user);
-
    // ---- getting request from user
+   printf("Waiting for user request!");
    tlv_request_t req;
    while(!read_request(fifo_server, &req)) {
       sleep(1);
@@ -35,21 +35,26 @@ int main(int argc, char *argv[]) {
    tlv_reply_t reply;
    acknowledge_request(&req, &reply);
 
+   // ---- create user fifo
+   user_fifo_create(&fifo_user, req.value.header.pid);
+
+   // ---- write reply
+   write(fifo_user, &reply, sizeof(tlv_reply_t));
+
    return 0;
 }
 
-static char *rand_string(char *str, size_t size)
-{
-    const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJK...";
-    if (size) {
-        --size;
-        for (size_t n = 0; n < size; n++) {
-            int key = rand() % (int) (sizeof charset - 1);
-            str[n] = charset[key];
-        }
-        str[size] = '\0';
-    }
-    return str;
+static char *rand_string(char *str, size_t size) {
+   const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJK...";
+   if (size) {
+     --size;
+      for (size_t n = 0; n < size; n++) {
+         int key = rand() % (int) (sizeof charset - 1);
+         str[n] = charset[key];
+      }
+      str[size] = '\0';
+   }
+   return str;
 }
 
 void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply) {
@@ -66,13 +71,13 @@ void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply) {
             create_user_account(&req->value.create, &reply->value);
             break;
          case OP_BALANCE:
-            check_user_balance(req->value.header.account_id, &reply->value);
+            //check_user_balance(req->value.header.account_id, &reply->value);
             break;
          case OP_TRANSFER:
-            create_user_transfer(&req->value.transfer, &reply->value);
+            //create_user_transfer(&req->value.transfer, &reply->value);
             break;
          case OP_SHUTDOWN:
-            shutdown_server(&reply->value);
+            //shutdown_server(&reply->value);
             break;
          default:
             printf("ERROR: Invalid Operation\n");
@@ -140,12 +145,12 @@ void create_user_account(req_create_account_t* create, rep_value_t* rep_value) {
    // ---- creating account
    accounts[create->account_id].account_id = create->account_id;
    accounts[create->account_id].balance = create->balance;
-   // TODO generate random salt
+   // generate random salt
    char salt[SALT_LEN + 1];
    
    strcpy(salt, rand_string(salt, 64));
    strcpy(accounts[create->account_id].salt, salt);
-   // TODO generate hash
+   // generate hash
    char command[] = "echo -n ";
 
    strcat(command, create->password);
@@ -322,9 +327,17 @@ void server_fifo_create(int* fifo_server) {
    printf("\nChannel created and connected.\nServer is online.\n");
 }
 
-void user_fifo_create(char* user_fifo_path) {
+void user_fifo_create(int* fifo_user, pid_t pid) {
    printf("\nCreating user FIFO communication channels...");
 
+   // ---- get user fifo path
+   char user_fifo_path[USER_FIFO_PATH_LEN];
+   strcpy(user_fifo_path, USER_FIFO_PATH_PREFIX);
+   char user_fifo_path_sufix[WIDTH_ID + 1];
+   sprintf(user_fifo_path_sufix, "%d", pid);
+   strcat(user_fifo_path, user_fifo_path_sufix);
+
+   printf("\nuser fifo path: %s\n", user_fifo_path);
    // ---- creating user fifo
    if (mkfifo(user_fifo_path, 0666)) {
       // If the file already exists, delete it
@@ -336,20 +349,6 @@ void user_fifo_create(char* user_fifo_path) {
       }
    }
 
-   printf("\n%s channel created.\n", user_fifo_path);
-}
-
-void server_connect_user(int* fifo_server, int* fifo_user) {
-   // ---- get user fifo path name 
-   printf("\nWaiting for user data...");   
-   char user_fifo_path[USER_FIFO_PATH_LEN];
-   // wait for server fifo to have something
-   while(!readline(*fifo_server, user_fifo_path)) sleep(1);
-
-   // ---- create user fifo
-   user_fifo_create(user_fifo_path);
-
-   printf("\nOpening FIFO communication channels...");
    // ---- opening user fifo - waits for user to connect to server
    *fifo_user = open(user_fifo_path, O_WRONLY);
    if (*fifo_user == -1) {
@@ -357,7 +356,7 @@ void server_connect_user(int* fifo_server, int* fifo_user) {
       exit(-2);
    }
 
-   printf("\nChannels opened.\nServer is connected to user <user_pid_here>.\n");
+   printf("\n%s channel created.\n", user_fifo_path);
 }
 
 int readline(int fd, char *str) {

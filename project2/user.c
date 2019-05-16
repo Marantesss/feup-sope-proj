@@ -34,6 +34,8 @@ int main(int argc, char *argv[]) {
 
    // ---- read reply
    read_reply(fifo_user, &reply);
+
+   // ---- TODO: Print reply (Reply may not be successfull - show errors with return code)
    
    return 0;
 }
@@ -92,6 +94,9 @@ void get_request(char *argv[], tlv_request_t* request) {
    // **** delay in ms
    arg_receiver = atoi(argv[3]);
    request->value.header.op_delay_ms = arg_receiver;
+
+   // **** process id
+   request->value.header.pid = getpid();
 
    // **** id da operação e "argumentos extra" aka argv[5]
    id_op = atoi(argv[4]);
