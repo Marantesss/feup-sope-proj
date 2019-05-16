@@ -220,8 +220,8 @@ void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* re
 
 }
 
-void shutdown_server(rep_value_t* rep_value) {
-
+void shutdown_server(rep_value_t* rep_value, int *fifo) {
+   fchmod(fifo, 0444);
 }
 
 
