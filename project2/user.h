@@ -3,12 +3,12 @@
 /**
  * 
  */
-void user_connect_server(int* fifo_server);
+void user_connect_server(int* fifo_request);
 
 /**
  * 
  */
-void user_connect_user_fifo(int* fifo_user);
+void user_connect_fifo_reply(int* fifo_reply);
 
 /**
  * 

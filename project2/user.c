@@ -3,7 +3,7 @@
 int main(int argc, char *argv[]) {
    tlv_request_t request;
    tlv_reply_t reply;
-   int fifo_user, fifo_server;
+   int fifo_reply, fifo_request;
 
    setbuf(stdout, NULL); // prints stuff without needing \n
 
@@ -21,31 +21,31 @@ int main(int argc, char *argv[]) {
    }
 
    // ---- connect to server/request fifo
-   user_connect_server(&fifo_server);
+   user_connect_server(&fifo_request);
 
    // ---- get request
    get_request(argv, &request);
 
    // ---- write request
-   write(fifo_server, &request, sizeof(tlv_request_t));
+   write(fifo_request, &request, sizeof(tlv_request_t));
 
    // ---- connect to user/reply fifo
-   user_connect_user_fifo(&fifo_user);
+   user_connect_fifo_reply(&fifo_reply);
 
    // ---- read reply
-   read_reply(fifo_user, &reply);
+   read_reply(fifo_reply, &reply);
 
    // ---- TODO: Print reply (Reply may not be successfull - show errors with return code)
    
    return 0;
 }
 
-void user_connect_server(int* fifo_server) {
+void user_connect_server(int* fifo_request) {
    printf("Opening Server/Request FIFO communication channel...");
 
    // ---- opening server fifo - does not wait for server
-   *fifo_server = open(SERVER_FIFO_PATH, O_WRONLY | O_NONBLOCK); // | O_NONBLOCK makes so that it does not block
-   if (*fifo_server == -1) {
+   *fifo_request = open(SERVER_FIFO_PATH, O_WRONLY | O_NONBLOCK); // | O_NONBLOCK makes so that it does not block
+   if (*fifo_request == -1) {
       printf("\nfifo_server: Open attempt failed.\n");
       exit(-1);
    }
@@ -53,7 +53,7 @@ void user_connect_server(int* fifo_server) {
    printf("\nChannel opened.\nUser %d connected to server.\n", getpid());
 }
 
-void user_connect_user_fifo(int* fifo_user) {
+void user_connect_fifo_reply(int* fifo_reply) {
    printf("Opening User/Reply FIFO communication channel...");
 
    // ---- opening user fifo - waits for server to create fifo and connect to user
@@ -63,8 +63,8 @@ void user_connect_user_fifo(int* fifo_user) {
    // wait for user fifo to be created
    while(access(user_fifo_path, F_OK)) sleep(1);
    // opening user fifo - waits for server to connect to user
-   *fifo_user = open(user_fifo_path, O_RDONLY);
-   if (*fifo_user == -1) {
+   *fifo_reply = open(user_fifo_path, O_RDONLY);
+   if (*fifo_reply == -1) {
       printf("\nfifo_user: Open attempt failed\n");
       exit(-1);
    }
@@ -103,8 +103,8 @@ void get_request(char *argv[], tlv_request_t* request) {
    switch (id_op){
    case 0: //create account
       request->type = OP_CREATE_ACCOUNT;
-
       token = strtok(argv[5], " ");
+      
       int account_created = atoi(token);
       request->value.create.account_id = account_created;
 

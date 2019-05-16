@@ -3,7 +3,7 @@
 int main(int argc, char *argv[]) {
    setbuf(stdout, NULL); // prints stuff without needing \n
    
-   int fifo_user, fifo_server;
+   int fifo_request, fifo_reply;
 
    printf("WARNING: No verifications are being made to command arguments!!!\n");
 
@@ -21,12 +21,12 @@ int main(int argc, char *argv[]) {
    create_admin_account(argv[2]);
 
    // ---- create server/request fifo
-   server_fifo_create(&fifo_server);
+   server_fifo_create(&fifo_reply);
 
    // ---- getting request from user
    printf("Waiting for user request!");
    tlv_request_t req;
-   while(!read_request(fifo_server, &req)) {
+   while(!read_request(fifo_reply, &req)) {
       sleep(1);
       printf("stuck in read_request\n");
    }
@@ -36,10 +36,10 @@ int main(int argc, char *argv[]) {
    acknowledge_request(&req, &reply);
 
    // ---- create user fifo
-   user_fifo_create(&fifo_user, req.value.header.pid);
+   user_fifo_create(&fifo_request, req.value.header.pid);
 
    // ---- write reply
-   write(fifo_user, &reply, sizeof(tlv_reply_t));
+   write(fifo_request, &reply, sizeof(tlv_reply_t));
 
    return 0;
 }
@@ -303,7 +303,7 @@ void create_admin_account(char* password) {
    printf("\nADMIN ACCOUNT CREATED.\n");
 }
 
-void server_fifo_create(int* fifo_server) {
+void server_fifo_create(int* fifo_reply) {
    printf("Creating server FIFO communication channels...");
 
    // ---- creating server fifo
@@ -318,8 +318,8 @@ void server_fifo_create(int* fifo_server) {
    }
 
    // ---- opening server fifo
-   *fifo_server = open(SERVER_FIFO_PATH, O_RDONLY | O_NONBLOCK); // | O_NONBLOCK makes so that it does not block
-   if (*fifo_server == -1) {
+   *fifo_reply = open(SERVER_FIFO_PATH, O_RDONLY | O_NONBLOCK); // | O_NONBLOCK makes so that it does not block
+   if (*fifo_reply == -1) {
       printf("\nfifo_server: Open attempt failed.\n");
       exit(-1);
    }
@@ -327,7 +327,7 @@ void server_fifo_create(int* fifo_server) {
    printf("\nChannel created and connected.\nServer is online.\n");
 }
 
-void user_fifo_create(int* fifo_user, pid_t pid) {
+void user_fifo_create(int* fifo_request, pid_t pid) {
    printf("\nCreating user FIFO communication channels...");
 
    // ---- get user fifo path
@@ -350,8 +350,8 @@ void user_fifo_create(int* fifo_user, pid_t pid) {
    }
 
    // ---- opening user fifo - waits for user to connect to server
-   *fifo_user = open(user_fifo_path, O_WRONLY);
-   if (*fifo_user == -1) {
+   *fifo_request = open(user_fifo_path, O_WRONLY);
+   if (*fifo_request == -1) {
       printf("\nfifo_user: Open attempt failed\n");
       exit(-2);
    }
