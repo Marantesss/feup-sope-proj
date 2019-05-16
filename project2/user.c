@@ -1,6 +1,6 @@
 #include "user.h"
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]){
    tlv_request_t request;
    tlv_reply_t reply;
    int fifo_reply, fifo_request;
@@ -8,13 +8,13 @@ int main(int argc, char *argv[]) {
    setbuf(stdout, NULL); // prints stuff without needing \n
 
    // ---- checking the minimum ammount of argumrnts
-   if (argc < 6) {
+   if (argc < 6){
       printf("Error: Too few arguments\n");
       printf("Usage: %s [account-id] [\"password\"] [delay-in-ms] [operation-id] [\"[]/[acc-id amount]/[acc-id balance password]\"]\n", argv[0]);
       exit(EXIT_FAILURE);
    }
    // ---- checking the maximum ammount of arguments
-   if (argc > 6) {
+   if (argc > 6){
       printf("Error: Too many arguments\n");
       printf("Usage: %s [account-id] [\"password\"] [delay-in-ms] [operation-id] [\"[]/[acc-id amount]/[acc-id balance password]\"]\n", argv[0]);
       exit(EXIT_FAILURE);
@@ -36,16 +36,17 @@ int main(int argc, char *argv[]) {
    read_reply(fifo_reply, &reply);
 
    // ---- TODO: Print reply (Reply may not be successfull - show errors with return code)
-   
+   print_reply(&reply);
+
    return 0;
 }
 
-void user_connect_server(int* fifo_request) {
+void user_connect_server(int *fifo_request){
    printf("Opening Server/Request FIFO communication channel...");
 
    // ---- opening server fifo - does not wait for server
    *fifo_request = open(SERVER_FIFO_PATH, O_WRONLY | O_NONBLOCK); // | O_NONBLOCK makes so that it does not block
-   if (*fifo_request == -1) {
+   if (*fifo_request == -1){
       printf("\nfifo_server: Open attempt failed.\n");
       exit(-1);
    }
@@ -53,7 +54,7 @@ void user_connect_server(int* fifo_request) {
    printf("\nChannel opened.\nUser %d connected to server.\n", getpid());
 }
 
-void user_connect_fifo_reply(int* fifo_reply) {
+void user_connect_fifo_reply(int *fifo_reply){
    printf("Opening User/Reply FIFO communication channel...");
 
    // ---- opening user fifo - waits for server to create fifo and connect to user
@@ -61,26 +62,27 @@ void user_connect_fifo_reply(int* fifo_reply) {
    char user_fifo_path[USER_FIFO_PATH_LEN];
    get_user_fifo_path(user_fifo_path);
    // wait for user fifo to be created
-   while(access(user_fifo_path, F_OK)) sleep(1);
+   while (access(user_fifo_path, F_OK))
+      sleep(1);
    // opening user fifo - waits for server to connect to user
    *fifo_reply = open(user_fifo_path, O_RDONLY);
-   if (*fifo_reply == -1) {
+   if (*fifo_reply == -1){
       printf("\nfifo_user: Open attempt failed\n");
       exit(-1);
    }
 
    printf("\nChannel opened.\n");
-
 }
 
-void get_user_fifo_path(char* user_fifo_path) {
+void get_user_fifo_path(char *user_fifo_path){
+
    strcpy(user_fifo_path, USER_FIFO_PATH_PREFIX);
    char user_fifo_path_sufix[WIDTH_ID + 1];
    sprintf(user_fifo_path_sufix, "%d", getpid());
    strcat(user_fifo_path, user_fifo_path_sufix);
 }
 
-void get_request(char *argv[], tlv_request_t* request) {
+void get_request(char *argv[], tlv_request_t *request){
    int arg_receiver, id_op;
    char *token;
 
@@ -104,13 +106,15 @@ void get_request(char *argv[], tlv_request_t* request) {
    case 0: //create account
       request->type = OP_CREATE_ACCOUNT;
       token = strtok(argv[5], " ");
-      
+
+
       int account_created = atoi(token);
       request->value.create.account_id = account_created;
 
       token = strtok(NULL, " ");
       int balance = atoi(token);
       request->value.create.balance = balance;
+
 
       token = strtok(NULL, " ");
       strcpy(request->value.create.password, token);
@@ -139,23 +143,83 @@ void get_request(char *argv[], tlv_request_t* request) {
    }
 }
 
-int read_reply(int fd, tlv_reply_t* reply) {
+int read_reply(int fd, tlv_reply_t *reply){
    int n;
 
    // reads pointer
    n = read(fd, reply, sizeof(tlv_reply_t));
 
-   return (n>0);
+   return (n > 0);
 }
 
-int readline(int fd, char *str) {
+int print_reply(tlv_reply_t *reply){
+
+   switch (reply->value.header.ret_code){
+   case 0:
+      switch (reply->type){
+      case 0: //create account
+         printf("OP_CREATE_ACCOUNT\n");
+         break;
+      case 1: //ver saldo
+         printf("YOUR BALANCE IS %d\n", reply->value.balance.balance);
+         break;
+      case 2: //transfere moneys
+         printf("TRANSFER SUCCESSFUL. BALANCE IS NOW %d\n", reply->value.transfer.balance);
+         break;
+      case 3: //desliga o servidor acho eu
+         printf("SERVER SHUTDOWN. %d SERVERS REMAINING\n", reply->value.shutdown.active_offices);
+         break;
+      default:
+         break;
+      }
+      break;
+   case 1:
+      printf("The server is currently (down).\n");
+      break;
+   case 2:
+      printf("The request sent to server timed out.\n");
+      break;
+   case 3:
+      printf("Unable to send reply message to user.\n");
+      break;
+   case 4:
+      printf("Invalid account id / password.\n");
+      break;
+   case 5:
+      printf("You are not allowed to request such an operation.\n");
+      break;
+   case 6:
+      printf("That account id is already in use.\n");
+      break;
+   case 7:
+      printf("There is no account with that id.\n");
+      break;
+   case 8:
+      printf("The source and destination accounts are the same.\n");
+      break;
+   case 9:
+      printf("The final balance would be too low.\n");
+      break;
+   case 10:
+      printf("The final balance would be too high.\n");
+      break;
+   case 11:
+   default:
+      printf("An unknown error occured\n");
+      break;
+   }
+
+   return 0;
+}
+
+int readline(int fd, char *str){
    int n;
 
-   do {
+   do{
       n = read(fd, str, 1);
-   } while (n>0 && *str++ != '\0');
+   } while (n > 0 && *str++ != '\0');
 
-   return (n>0);
+   return (n > 0);
 }
 
 /*
