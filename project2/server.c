@@ -46,10 +46,12 @@ int main(int argc, char *argv[]) {
          if (validate_request(&req, &shutdown_reply)) {
             // ---- command
             shutdown_server(&shutdown_reply.value, &fifo_request);
-            // ---- send signal to unlcok all threads waiting for new requests
+            // ---- send signal to unlock all threads waiting for new requests
             pthread_cond_broadcast(&cond_queued_req);
-            // --- send shutdown signal
+            // ---- shutdown is on
+            printf("Shutdown1 - Main: %d\n", shutdown);
             shutdown = 1;
+            printf("Shutdown2 - Main: %d\n", shutdown);
             // ---- break cycle
             break;
          }
@@ -90,20 +92,26 @@ void* thread_work() {
    tlv_reply_t reply;
    tlv_request_t next_request;
 
-   // ---- theards are always cheeking if there are requests available
+   // ---- threads are always cheeking if there are requests available
    while (1) {
-
       // ---- lock threads
       pthread_mutex_lock(&mut);
 
       if (empty(&request_queue)) {
-         if (shutdown)
+         printf("thread: %d\n", shutdown);
+         if (shutdown) {
+            printf("here %ld\n", pthread_self());
             break;
-         else 
+         }
+         else {
+            printf("im waiting for signal: here %ld\n", pthread_self());
             pthread_cond_wait(&cond_queued_req, &mut);
+            printf("im out: here %ld\n", pthread_self());
+         }
       }
 
       if (!empty(&request_queue)) {
+         printf("Thread is acknowledging a req %ld\n", pthread_self());
          // ---- get next request
          next_request = front(&request_queue);
          // ---- dequeue the request
@@ -124,7 +132,6 @@ void* thread_work() {
          // ---- close user fifo
          close(fifo_reply);
       }
-
    }
    return NULL;
 }

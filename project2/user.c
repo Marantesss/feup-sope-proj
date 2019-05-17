@@ -230,22 +230,3 @@ int readline(int fd, char *str){
 
    return (n > 0);
 }
-
-/*
-void create_test_request(tlv_request_t* req) {
-   // ---- type
-   req.type = OP_CREATE_ACCOUNT;
-   // ---- value
-   // header
-   req.value.header.account_id = 0;
-   req.value.header.op_delay_ms = 10;
-   strcpy(req.value.header.password,"olaolaol");
-   req.value.header.pid = getpid();
-   // create
-   req.value.create.account_id = 2;
-   req.value.create.balance = 100;
-   strcpy(req.value.create.password, "ola");
-   // ---- length
-   req.length = sizeof(req.value);
-}
-*/
