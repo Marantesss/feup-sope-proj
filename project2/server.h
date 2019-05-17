@@ -32,6 +32,16 @@ pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
 /**
  * 
  */
+int shutdown = 0;
+
+/**
+ * 
+ */
+pthread_cond_t cond_queued_req = PTHREAD_COND_INITIALIZER;
+
+/**
+ * 
+ */
 queue_t request_queue;
 
 /**

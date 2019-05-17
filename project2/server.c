@@ -24,14 +24,12 @@ int main(int argc, char *argv[]) {
    server_fifo_create(&fifo_request);
 
    // ---- send threads to work
-   /*
    for (int i = 0; i < num_threads; i++) {
       pthread_create(&thread_id[i], NULL, thread_work, NULL);
    }
-   */
+   
 
-   //while (o server nao fazer shutdown) {
-
+   while (1) {
       // ---- getting request from user
       printf("Waiting for user request!");
       tlv_request_t req;
@@ -46,34 +44,40 @@ int main(int argc, char *argv[]) {
          tlv_reply_t shutdown_reply;
          int fifo_reply;
          if (validate_request(&req, &shutdown_reply)) {
-            // ---- reply type
-            shutdown_reply.type = req.type;
             // ---- command
             shutdown_server(&shutdown_reply.value, &fifo_request);
-            // ---- reply length
-            shutdown_reply.length = sizeof(shutdown_reply.value);
-            // ---- create user fifo
-            user_fifo_create(&fifo_reply, req.value.header.pid);
-            // ---- write reply
-            write(fifo_reply, &shutdown_reply, sizeof(tlv_reply_t));
+            // ---- send signal to unlcok all threads waiting for new requests
+            pthread_cond_broadcast(&cond_queued_req);
+            // --- send shutdown signal
+            shutdown = 1;
+            // ---- break cycle
+            break;
          }
+         // ---- reply type
+         shutdown_reply.type = req.type;
+         // ---- reply length
+         shutdown_reply.length = sizeof(shutdown_reply.value);
+         // ---- create user fifo
+         user_fifo_create(&fifo_reply, req.value.header.pid);
+         // ---- write reply
+         write(fifo_reply, &shutdown_reply, sizeof(tlv_reply_t));
       }
       else {
+         pthread_mutex_lock(&mut);
          // ---- enqueue the request
          push(&request_queue, req);
+         // ---- send queued_req signal
+         pthread_cond_signal(&cond_queued_req);
+
+         pthread_mutex_unlock(&mut);
       }
-
-      thread_work();
-
-   //}
-
-   /*
+   }
+   
    // ---- wait for threads to finish working
    for (int i = 1; i <= num_threads; i++) {
       pthread_join(thread_id[i], NULL);
    }
-   */
-
+   
    // ---- close and delete server/request fifo
    close(fifo_request);
    remove(SERVER_FIFO_PATH);
@@ -84,17 +88,29 @@ int main(int argc, char *argv[]) {
 void* thread_work() {
    int fifo_reply;
    tlv_reply_t reply;
+   tlv_request_t next_request;
 
    // ---- theards are always cheeking if there are requests available
-   //while (o server nao fazer shutdown) {
+   while (1) {
+
+      // ---- lock threads
+      pthread_mutex_lock(&mut);
+
+      if (empty(&request_queue)) {
+         if (shutdown)
+            break;
+         else 
+            pthread_cond_wait(&cond_queued_req, &mut);
+      }
+
       if (!empty(&request_queue)) {
-         pthread_mutex_lock(&mut);
-         num_active_threads++;
-         
          // ---- get next request
-         tlv_request_t next_request = front(&request_queue);
+         next_request = front(&request_queue);
          // ---- dequeue the request
          pop(&request_queue);
+
+         // ---- unlock threads (queue access is done)
+         pthread_mutex_unlock(&mut);
 
          // ---- process request
          acknowledge_request(&next_request, &reply);
@@ -107,11 +123,9 @@ void* thread_work() {
 
          // ---- close user fifo
          close(fifo_reply);
-
-         num_active_threads--;
-         pthread_mutex_unlock(&mut);
       }
-   //}
+
+   }
    return NULL;
 }
 
@@ -288,7 +302,7 @@ void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* re
    accounts[id].balance -= transfer->amount;
    accounts[transfer->account_id].balance += transfer->amount;
    rep_value->header.ret_code = RC_OK;
-   rep_value->transfer.balance = accounts[transfer->account_id].balance;
+   rep_value->transfer.balance = accounts[id].balance;
 
    printf("\nUSER TRANSFER CREATED.\n");
 }
