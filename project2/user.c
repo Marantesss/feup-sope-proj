@@ -155,55 +155,55 @@ int read_reply(int fd, tlv_reply_t *reply){
 int print_reply(tlv_reply_t *reply){
 
    switch (reply->value.header.ret_code){
-   case 0:
+   case RC_OK:
       switch (reply->type){
-      case 0: //create account
+      case OP_CREATE_ACCOUNT: //create account
          printf("OP_CREATE_ACCOUNT\n");
          break;
-      case 1: //ver saldo
+      case OP_BALANCE: //ver saldo
          printf("YOUR BALANCE IS %d\n", reply->value.balance.balance);
          break;
-      case 2: //transfere moneys
+      case OP_TRANSFER: //transfere moneys
          printf("TRANSFER SUCCESSFUL. BALANCE IS NOW %d\n", reply->value.transfer.balance);
          break;
-      case 3: //desliga o servidor acho eu
+      case OP_SHUTDOWN: //desliga o servidor acho eu
          printf("SERVER SHUTDOWN. %d SERVERS REMAINING\n", reply->value.shutdown.active_offices);
          break;
       default:
          break;
       }
       break;
-   case 1:
+   case RC_SRV_DOWN:
       printf("The server is currently (down).\n");
       break;
-   case 2:
+   case RC_SRV_TIMEOUT:
       printf("The request sent to server timed out.\n");
       break;
-   case 3:
+   case RC_USR_DOWN:
       printf("Unable to send reply message to user.\n");
       break;
-   case 4:
+   case RC_LOGIN_FAIL:
       printf("Invalid account id / password.\n");
       break;
-   case 5:
+   case RC_OP_NALLOW:
       printf("You are not allowed to request such an operation.\n");
       break;
-   case 6:
+   case RC_ID_IN_USE:
       printf("That account id is already in use.\n");
       break;
-   case 7:
+   case RC_ID_NOT_FOUND:
       printf("There is no account with that id.\n");
       break;
-   case 8:
+   case RC_SAME_ID:
       printf("The source and destination accounts are the same.\n");
       break;
-   case 9:
+   case RC_NO_FUNDS:
       printf("The final balance would be too low.\n");
       break;
-   case 10:
+   case RC_TOO_HIGH:
       printf("The final balance would be too high.\n");
       break;
-   case 11:
+   case RC_OTHER:
    default:
       printf("An unknown error occured\n");
       break;
