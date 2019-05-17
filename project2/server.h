@@ -72,7 +72,7 @@ void shutdown_server(rep_value_t* rep_value, int *fifo);
 /**
  * 
  */
-void server_fifo_create(int* fifo_server);
+void server_fifo_create(int* fifo_request);
 
 /**
  * 
