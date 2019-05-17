@@ -176,7 +176,7 @@ int print_reply(tlv_reply_t *reply){
          printf("TRANSFER SUCCESSFUL. BALANCE IS NOW %d\n", reply->value.transfer.balance);
          break;
       case 3: //desliga o servidor acho eu
-         printf("SERVER SHUTDOWN. %d SERVERS REMAINING\n", reply->value.shutdown.active_offices);
+         printf("SERVER SHUTDOWN. %d ACTIVE OFFICES REMAINING\n", reply->value.shutdown.active_offices);
          break;
       default:
          break;

@@ -44,8 +44,19 @@ int main(int argc, char *argv[]) {
       // ---- main thread should take care of shutdown requests
       if (req.type == OP_SHUTDOWN) {
          tlv_reply_t shutdown_reply;
-         if (validate_request(&req, &shutdown_reply))
+         int fifo_reply;
+         if (validate_request(&req, &shutdown_reply)) {
+            // ---- reply type
+            shutdown_reply.type = req.type;
+            // ---- command
             shutdown_server(&shutdown_reply.value, &fifo_request);
+            // ---- reply length
+            shutdown_reply.length = sizeof(shutdown_reply.value);
+            // ---- create user fifo
+            user_fifo_create(&fifo_reply, req.value.header.pid);
+            // ---- write reply
+            write(fifo_reply, &shutdown_reply, sizeof(tlv_reply_t));
+         }
       }
       else {
          // ---- enqueue the request
