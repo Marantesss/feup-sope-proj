@@ -27,7 +27,12 @@ pthread_t thread_id[MAX_BANK_OFFICES];
 /**
  * 
  */
-pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t queue_mut = PTHREAD_MUTEX_INITIALIZER;
+
+/**
+ * 
+ */
+pthread_mutex_t counter_mut = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * 

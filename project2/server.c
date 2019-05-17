@@ -28,10 +28,10 @@ int main(int argc, char *argv[]) {
       pthread_create(&thread_id[i], NULL, thread_work, NULL);
    }
    
+   printf("Waiting for user request...");
 
    while (1) {
       // ---- getting request from user
-      printf("Waiting for user request...");
       tlv_request_t req;
       while(!read_request(fifo_request, &req));
 
@@ -65,13 +65,13 @@ int main(int argc, char *argv[]) {
          write(fifo_reply, &shutdown_reply, sizeof(tlv_reply_t));
       }
       else {
-         pthread_mutex_lock(&mut);
+         pthread_mutex_lock(&queue_mut);
          // ---- enqueue the request
          push(&request_queue, req);
          // ---- send queued_req signal
          pthread_cond_signal(&cond_queued_req);
 
-         pthread_mutex_unlock(&mut);
+         pthread_mutex_unlock(&queue_mut);
       }
    }
    
@@ -96,26 +96,30 @@ void* thread_work() {
    while (1) {
       // ---- lock threads if not shutdown
       if (!shutdown)
-         pthread_mutex_lock(&mut);
+         pthread_mutex_lock(&queue_mut);
       else
-         pthread_mutex_unlock(&mut);
+         pthread_mutex_unlock(&queue_mut);
 
       if (empty(&request_queue)) {
          if (shutdown)
             break;
          else
-            pthread_cond_wait(&cond_queued_req, &mut);
+            pthread_cond_wait(&cond_queued_req, &queue_mut);
       }
       
 
       if (!empty(&request_queue)) {
+         pthread_mutex_lock(&counter_mut);
+         num_active_threads++;
+         pthread_mutex_unlock(&counter_mut);
+
          // ---- get next request
          next_request = front(&request_queue);
          // ---- dequeue the request
          pop(&request_queue);
 
          // ---- unlock threads (queue access is done)
-         pthread_mutex_unlock(&mut);
+         pthread_mutex_unlock(&queue_mut);
 
          // ---- process request
          acknowledge_request(&next_request, &reply);
@@ -128,6 +132,12 @@ void* thread_work() {
 
          // ---- close user fifo
          close(fifo_reply);
+
+         pthread_mutex_lock(&counter_mut);
+         num_active_threads--;
+         pthread_mutex_unlock(&counter_mut);
+
+         printf("Waiting for user request...");
       }
    }
    return NULL;
