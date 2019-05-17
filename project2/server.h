@@ -77,7 +77,7 @@ void server_fifo_create(int* fifo_request);
 /**
  * 
  */
-void user_fifo_create(int* fifo_user, pid_t pid);
+void user_fifo_create(int* fifo_reply, pid_t pid);
 
 /**
  * 
