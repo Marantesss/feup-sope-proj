@@ -23,45 +23,45 @@ int main(int argc, char *argv[]) {
    // ---- create server/request fifo
    server_fifo_create(&fifo_request);
 
-   // ---- getting request from user
-   printf("Waiting for user request!");
-   tlv_request_t req;
-   while(!read_request(fifo_request, &req)) {
-      sleep(1);
-      printf("stuck in read_request\n");
+   // ---- send threads to work
+   /*
+   for (int i = 0; i < num_threads; i++) {
+      pthread_create(&thread_id[i], NULL, thread_work, NULL);
    }
+   */
 
-   // ---- main thread should take care of shutdown requests
-   if (req.type == OP_SHUTDOWN) {
-      //shutdown_server();
-   }
+   //while (o server nao fazer shutdown) {
 
-   // ---- enqueue the request
-   push(&request_queue, req);
+      // ---- getting request from user
+      printf("Waiting for user request!");
+      tlv_request_t req;
+      while(!read_request(fifo_request, &req)) {
+         sleep(1);
+         printf("\nstuck in read_request");
+      }
+      printf("\n");
 
+      // ---- main thread should take care of shutdown requests
+      if (req.type == OP_SHUTDOWN) {
+         tlv_reply_t shutdown_reply;
+         if (validate_request(&req, &shutdown_reply))
+            shutdown_server(&shutdown_reply.value, &fifo_request);
+      }
+      else {
+         // ---- enqueue the request
+         push(&request_queue, req);
+      }
 
-   // (thread function)
-   //while (!empty(&request_queue)) {
-      int fifo_reply;
-      tlv_reply_t reply;
-      // ---- get next request
-      tlv_request_t next_request = front(&request_queue);
-      // ---- dequeue the request
-      pop(&request_queue);
-
-      // ---- process request
-      acknowledge_request(&next_request, &reply);
-
-      // ---- create user fifo
-      user_fifo_create(&fifo_reply, next_request.value.header.pid);
-
-      // ---- write reply
-      write(fifo_reply, &reply, sizeof(tlv_reply_t));
-
-      // ---- close user fifo
-      close(fifo_reply);
+      thread_work();
 
    //}
+
+   /*
+   // ---- wait for threads to finish working
+   for (int i = 1; i <= num_threads; i++) {
+      pthread_join(thread_id[i], NULL);
+   }
+   */
 
    // ---- close and delete server/request fifo
    close(fifo_request);
@@ -69,6 +69,41 @@ int main(int argc, char *argv[]) {
 
    return 0;
 }
+
+void* thread_work() {
+   int fifo_reply;
+   tlv_reply_t reply;
+
+   // ---- theards are always cheeking if there are requests available
+   //while (o server nao fazer shutdown) {
+      if (!empty(&request_queue)) {
+         pthread_mutex_lock(&mut);
+         num_active_threads++;
+         
+         // ---- get next request
+         tlv_request_t next_request = front(&request_queue);
+         // ---- dequeue the request
+         pop(&request_queue);
+
+         // ---- process request
+         acknowledge_request(&next_request, &reply);
+
+         // ---- create user fifo
+         user_fifo_create(&fifo_reply, next_request.value.header.pid);
+
+         // ---- write reply
+         write(fifo_reply, &reply, sizeof(tlv_reply_t));
+
+         // ---- close user fifo
+         close(fifo_reply);
+
+         num_active_threads--;
+         pthread_mutex_unlock(&mut);
+      }
+   //}
+   return NULL;
+}
+
 
 static char *rand_string(char *str, size_t size) {
    const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -105,7 +140,6 @@ void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply) {
             create_user_transfer(req->value.header.account_id, &req->value.transfer, &reply->value);
             break;
          case OP_SHUTDOWN:
-            //shutdown_server(&reply->value);
             break;
          default:
             printf("ERROR: Invalid Operation\n");
@@ -248,11 +282,12 @@ void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* re
    printf("\nUSER TRANSFER CREATED.\n");
 }
 
-/*
-void shutdown_server(rep_value_t* rep_value, int *fifo) {
-   fchmod(fifo, 0444);
+void shutdown_server(rep_value_t* rep_value, int *fifo_request) {
+   fchmod(*fifo_request, 0444);
+   // TODO, get number of active threads (not sure if this works)
+   rep_value->shutdown.active_offices = num_active_threads;
 }
-*/
+
 
 int validate_user(req_header_t *req_header, rep_header_t* reply_header) {
    // ---- check id
@@ -422,7 +457,6 @@ void user_fifo_create(int* fifo_reply, pid_t pid) {
    sprintf(user_fifo_path_sufix, "%d", pid);
    strcat(user_fifo_path, user_fifo_path_sufix);
 
-   printf("\nuser fifo path: %s\n", user_fifo_path);
    // ---- creating user fifo
    if (mkfifo(user_fifo_path, 0666)) {
       // If the file already exists, delete it

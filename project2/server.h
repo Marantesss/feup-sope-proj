@@ -17,12 +17,27 @@ int num_threads;
 /**
  * 
  */
+int num_active_threads = 0;
+
+/**
+ * 
+ */
+pthread_t thread_id[MAX_BANK_OFFICES];
+
+/**
+ * 
+ */
+pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
+
+/**
+ * 
+ */
 queue_t request_queue;
 
 /**
  * 
  */
-void acknowledge_re(tlv_request_t *req, tlv_reply_t *reply);
+void* thread_work();
 
 /**
  * 
@@ -67,7 +82,7 @@ void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* re
 /**
  * 
  */
-void shutdown_server(rep_value_t* rep_value, int *fifo);
+void shutdown_server(rep_value_t* rep_value, int *fifo_request);
 
 /**
  * 
