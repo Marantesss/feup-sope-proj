@@ -1,7 +1,10 @@
 CC=gcc
 CFLAGS=-Wall -Wextra -Werror -pedantic -lpthread
 
-all: queue user server
+all: utils queue user server
+
+utils: utils.c
+	$(CC) $(CFLAGS) -c -o utils.o utils.c
 
 queue: queue.c
 	$(CC) $(CFLAGS) -c -o queue.o queue.c
@@ -10,7 +13,7 @@ user: user.c
 	$(CC) $(CFLAGS) -o user.o user.c
 
 server: server.c
-	$(CC) $(CFLAGS) -o server.o server.c queue.o
+	$(CC) $(CFLAGS) -o server.o server.c queue.o utils.o
 
 #log: log
 #	$(CC) $(CFLAGS) -o log.o log.c
