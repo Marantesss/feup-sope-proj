@@ -4,6 +4,8 @@ int main(int argc, char *argv[]){
    tlv_request_t request;
    tlv_reply_t reply;
    int fifo_reply, fifo_request;
+   int logfile;
+   logfile = open(USER_LOGFILE, O_APPEND);
 
    setbuf(stdout, NULL); // prints stuff without needing \n
 
@@ -25,6 +27,7 @@ int main(int argc, char *argv[]){
 
    // ---- get request
    get_request(argv, &request);
+   logRequest(logfile,request.value.header.account_id, &request);
 
    // ---- write request
    write(fifo_request, &request, sizeof(tlv_request_t));
@@ -34,9 +37,12 @@ int main(int argc, char *argv[]){
 
    // ---- read reply
    read_reply(fifo_reply, &reply);
+   logReply(logfile, reply.value.header.account_id, &reply);
 
-   // ---- TODO: Print reply (Reply may not be successfull - show errors with return code)
+   // ---- Print reply (Reply may not be successfull - show errors with return code)
    print_reply(&reply);
+
+   close(logfile);
 
    return 0;
 }
@@ -103,7 +109,7 @@ void get_request(char *argv[], tlv_request_t *request){
    // **** id da operação e "argumentos extra" aka argv[5]
    id_op = atoi(argv[4]);
    switch (id_op){
-   case 0: //create account
+   case OP_CREATE_ACCOUNT: //create account
       request->type = OP_CREATE_ACCOUNT;
       token = strtok(argv[5], " ");
 
@@ -120,10 +126,10 @@ void get_request(char *argv[], tlv_request_t *request){
       strcpy(request->value.create.password, token);
 
       break;
-   case 1: //ver saldo
+   case OP_BALANCE: //ver saldo
       request->type = OP_BALANCE; //ignora o ultimo argumento, string vazia
       break;
-   case 2: //transfere moneys
+   case OP_TRANSFER: //transfere moneys
       request->type = OP_TRANSFER;
 
       token = strtok(argv[5], " ");
@@ -135,7 +141,7 @@ void get_request(char *argv[], tlv_request_t *request){
       request->value.transfer.amount = amount;
 
       break;
-   case 3: //desliga o servidor acho eu
+   case OP_SHUTDOWN: //desliga o servidor acho eu
       request->type = OP_SHUTDOWN; //ignora o ultimo argumento, string vazia
       break;
    default:

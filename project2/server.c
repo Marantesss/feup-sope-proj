@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
    server_fifo_create(&fifo_reply);
 
    // ---- getting request from user
-   printf("Waiting for user request!");
+   printf("Waiting for user request!\n");
    tlv_request_t req;
    while(!read_request(fifo_reply, &req)) {
       sleep(1);

@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <sys/file.h>
 #include "sope.h"
+#include "log.c"
 
 /**
  * 
