@@ -136,20 +136,6 @@ void* thread_work() {
    return NULL;
 }
 
-
-static char *rand_string(char *str, size_t size) {
-   const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-   if (size) {
-     --size;
-      for (size_t n = 0; n < size; n++) {
-         int key = rand() % (int) (sizeof charset - 1);
-         str[n] = charset[key];
-      }
-      str[size] = '\0';
-   }
-   return str;
-}
-
 void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply) {
    // ---- wait for request's delay time
    usleep(req->value.header.op_delay_ms);
