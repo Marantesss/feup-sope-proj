@@ -11,7 +11,7 @@ void user_connect_server(int* fifo_request);
 /**
  * 
  */
-void user_connect_fifo_reply(int* fifo_reply);
+void user_connect_fifo_reply(int *fifo_reply, char* user_fifo_path);
 
 /**
  * 

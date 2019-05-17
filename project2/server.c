@@ -5,7 +5,6 @@ int main(int argc, char *argv[]) {
 
    setbuf(stdout, NULL); // prints stuff without needing \n
    
-
    printf("WARNING: No verifications are being made to command arguments!!!\n");
 
    if(argc != 3) {
@@ -59,8 +58,14 @@ int main(int argc, char *argv[]) {
       // ---- write reply
       write(fifo_request, &reply, sizeof(tlv_reply_t));
 
+      // ---- close user fifo
+      close(fifo_reply);
 
    //}
+
+   // ---- close and delete server/request fifo
+   close(fifo_request);
+   remove(SERVER_FIFO_PATH);
 
    return 0;
 }
@@ -136,31 +141,31 @@ void create_user_account(req_create_account_t* create, rep_value_t* rep_value) {
    // ---- checking if account credentials are valid
    // checking id
    if (!between(1, create->account_id, MAX_BANK_ACCOUNTS)) {
-      printf("ERROR: Invalid ID - too small or too big\n");
+      printf("\nERROR: Invalid ID - too small or too big");
       rep_value->header.ret_code = RC_OTHER;
       return;
    }
    if (create->account_id == accounts[create->account_id].account_id) {
-      printf("ERROR: Invalid ID - id already in use\n");
+      printf("\nERROR: Invalid ID - id already in use");
       rep_value->header.ret_code = RC_ID_IN_USE;
       return;
    }
    // checking balance
    if (!between(MIN_BALANCE, create->balance, MAX_BALANCE)) {
-      printf("ERROR: Invalid balance -  too little or too much\n");
+      printf("\nERROR: Invalid balance -  too little or too much");
       rep_value->header.ret_code = RC_OTHER;
       return;
    }
    // checking password
    size_t password_length = strlen(create->password);
    if (!between(MIN_PASSWORD_LEN, password_length, MAX_PASSWORD_LEN)) {
-      printf("ERROR: Invalid password - too long or too short\n");
+      printf("\nERROR: Invalid password - too long or too short");
       rep_value->header.ret_code = RC_OTHER;
       return;
    }
    // checking for spaces in password
    if (strchr(create->password, ' ') != NULL) {
-      printf("ERROR: Invalid password - password contains spaces\n");
+      printf("\nERROR: Invalid password - password contains spaces");
       rep_value->header.ret_code = RC_OTHER;
       return;
    }
@@ -214,23 +219,23 @@ void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* re
    // ---- checking if account credentials are valid
    // checking id
    if (!between(1, transfer->account_id, MAX_BANK_ACCOUNTS)) {
-      printf("ERROR: Invalid ID - too small or too big\n");
+      printf("\nERROR: Invalid ID - too small or too big");
       rep_value->header.ret_code = RC_OTHER;
       return;
    }
    if (transfer->account_id != accounts[transfer->account_id].account_id) {
-      printf("ERROR: Invalid ID - id does not exist\n");
+      printf("\nERROR: Invalid ID - id does not exist");
       rep_value->header.ret_code = RC_ID_IN_USE;
       return;
    }
    // checking funds
    if (!between(MIN_BALANCE, transfer->amount, accounts[id].balance)) {
-      printf("ERROR: Invalid transfer amount - not enough funds from sender\n");
+      printf("\nERROR: Invalid transfer amount - not enough funds from sender");
       rep_value->header.ret_code = RC_NO_FUNDS;
       return;
    }
    if (!between(MIN_BALANCE, transfer->amount + accounts[transfer->account_id].balance, MAX_BALANCE)) {
-      printf("ERROR: Invalid transfer amount - too much funds from receiver\n");
+      printf("\nERROR: Invalid transfer amount - too much funds from receiver");
       rep_value->header.ret_code = RC_NO_FUNDS;
       return;
    }
@@ -253,6 +258,7 @@ int validate_user(req_header_t *req_header, rep_header_t* reply_header) {
    // ---- check id
    // check if not admin (id != 0)
    if (is_admin(req_header->account_id)) {
+      printf("ERROR: Invalid ID - Client only operation\n");
       reply_header->ret_code = RC_OP_NALLOW;
       return 0;
    }
@@ -290,6 +296,7 @@ int validate_user(req_header_t *req_header, rep_header_t* reply_header) {
 
    if (strcmp(req_hash, accounts[req_header->account_id].hash)) {
       reply_header->ret_code = RC_LOGIN_FAIL;
+      printf("ERROR: Invalid Password\n");
       return 0;
    }
    else {
@@ -301,6 +308,7 @@ int validate_user(req_header_t *req_header, rep_header_t* reply_header) {
 int validate_admin(req_header_t *req_header, rep_header_t* reply_header) {
    // ---- check if admin (id = 0)
    if (!(is_admin(req_header->account_id))) {
+      printf("ERROR: Invalid ID - Admin only operation\n");
       reply_header->ret_code = RC_OP_NALLOW;
       return 0;
    }
@@ -326,6 +334,7 @@ int validate_admin(req_header_t *req_header, rep_header_t* reply_header) {
    strcpy(req_hash, strtok(hash, " "));
    
    if (strcmp(req_hash, accounts[req_header->account_id].hash)) {
+      printf("ERROR: Invalid Password\n");
       reply_header->ret_code = RC_LOGIN_FAIL;
       return 0;
    }
@@ -341,12 +350,12 @@ void create_admin_account(char* password) {
    // checking password
    size_t password_length = strlen(password);
    if (!between(MIN_PASSWORD_LEN, password_length, MAX_PASSWORD_LEN)) {
-      printf("ERROR: Invalid password\n");
+      printf("\nERROR: Invalid password");
       exit(EXIT_FAILURE);
    }
    strtok(password, " ");
    if (strlen(password) != password_length) {
-      printf("ERROR: Invalid password\n");
+      printf("\nERROR: Invalid password");
       exit(EXIT_FAILURE);
    }
 

@@ -4,6 +4,7 @@ int main(int argc, char *argv[]){
    tlv_request_t request;
    tlv_reply_t reply;
    int fifo_reply, fifo_request;
+   char user_fifo_path[USER_FIFO_PATH_LEN];
 
    setbuf(stdout, NULL); // prints stuff without needing \n
 
@@ -29,14 +30,21 @@ int main(int argc, char *argv[]){
    // ---- write request
    write(fifo_request, &request, sizeof(tlv_request_t));
 
+   // ---- close server/request fifo
+   close(fifo_request);
+
    // ---- connect to user/reply fifo
-   user_connect_fifo_reply(&fifo_reply);
+   user_connect_fifo_reply(&fifo_reply, user_fifo_path);
 
    // ---- read reply
    read_reply(fifo_reply, &reply);
 
-   // ---- TODO: Print reply (Reply may not be successfull - show errors with return code)
+   // ---- print reply (Reply may not be successfull - show errors with return code)
    print_reply(&reply);
+
+   // ---- close and delete user/reply fifo
+   close(fifo_reply);
+   remove(user_fifo_path);
 
    return 0;
 }
@@ -54,12 +62,11 @@ void user_connect_server(int *fifo_request){
    printf("\nChannel opened.\nUser %d connected to server.\n", getpid());
 }
 
-void user_connect_fifo_reply(int *fifo_reply){
+void user_connect_fifo_reply(int *fifo_reply, char* user_fifo_path) {
    printf("Opening User/Reply FIFO communication channel...");
 
    // ---- opening user fifo - waits for server to create fifo and connect to user
-   // get user fifo path name
-   char user_fifo_path[USER_FIFO_PATH_LEN];
+   // get user fifo path name;
    get_user_fifo_path(user_fifo_path);
    // wait for user fifo to be created
    while (access(user_fifo_path, F_OK))
@@ -74,7 +81,7 @@ void user_connect_fifo_reply(int *fifo_reply){
    printf("\nChannel opened.\n");
 }
 
-void get_user_fifo_path(char *user_fifo_path){
+void get_user_fifo_path(char *user_fifo_path) {
 
    strcpy(user_fifo_path, USER_FIFO_PATH_PREFIX);
    char user_fifo_path_sufix[WIDTH_ID + 1];
@@ -85,6 +92,8 @@ void get_user_fifo_path(char *user_fifo_path){
 void get_request(char *argv[], tlv_request_t *request){
    int arg_receiver, id_op;
    char *token;
+
+   printf("WARNING: No verifications are being made to command arguments!!!\n");
 
    // **** id da conta
    arg_receiver = atoi(argv[1]);
