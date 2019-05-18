@@ -1,4 +1,5 @@
 #include "user.h"
+#include "log.c"
 
 int main(int argc, char *argv[]){
    tlv_request_t request;
@@ -28,7 +29,7 @@ int main(int argc, char *argv[]){
 
    // ---- get request
    get_request(argv, &request);
-   logRequest(logfile,request.value.header.account_id, &request);
+   logRequest(logfile,request.value.header.pid, &request);
 
    // ---- write request
    write(fifo_request, &request, sizeof(tlv_request_t));
@@ -41,7 +42,7 @@ int main(int argc, char *argv[]){
 
    // ---- read reply
    read_reply(fifo_reply, &reply);
-   logReply(logfile, reply.value.header.account_id, &reply);
+   logReply(logfile, getpid(), &reply);
 
    // ---- print reply (Reply may not be successfull - show errors with return code)
    print_reply(&reply);
