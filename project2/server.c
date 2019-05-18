@@ -1,52 +1,144 @@
 #include "server.h"
 
 int main(int argc, char *argv[]) {
+   int fifo_request;
+
    setbuf(stdout, NULL); // prints stuff without needing \n
    
-   int fifo_request, fifo_reply;
-
    printf("WARNING: No verifications are being made to command arguments!!!\n");
 
    if(argc != 3) {
       printf("Too few arguments\n");
       exit(EXIT_FAILURE);
    }
-
-   // maybe not necessary
-   //memset(accounts, 0, MAX_BANK_ACCOUNTS*sizeof(bank_account_t));
    
    num_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
+
+   // ---- init request queue
+   init(&request_queue);
 
    // ---- create admin account
    create_admin_account(argv[2]);
 
    // ---- create server/request fifo
-   server_fifo_create(&fifo_reply);
+   server_fifo_create(&fifo_request);
 
-   // ---- getting request from user
-   printf("Waiting for user request!\n");
-   tlv_request_t req;
-   while(!read_request(fifo_reply, &req)) {
-      sleep(1);
-      printf("stuck in read_request\n");
+   // ---- send threads to work
+   for (int i = 0; i < num_threads; i++) {
+      pthread_create(&thread_id[i], NULL, thread_work, NULL);
    }
+   
 
-   // ---- getting reply from server
-   tlv_reply_t reply;
-   usleep(req.value.header.op_delay_ms);
-   acknowledge_request(&req, &reply);
+   while (1) {
+      // ---- getting request from user
+      printf("Waiting for user request!");
+      tlv_request_t req;
+      while(!read_request(fifo_request, &req)) {
+         sleep(1);
+         printf("\nstuck in read_request");
+      }
+      printf("\n");
 
-   // ---- create user fifo
-   user_fifo_create(&fifo_request, req.value.header.pid);
+      // ---- main thread should take care of shutdown requests
+      if (req.type == OP_SHUTDOWN) {
+         tlv_reply_t shutdown_reply;
+         int fifo_reply;
+         if (validate_request(&req, &shutdown_reply)) {
+            // ---- command
+            shutdown_server(&shutdown_reply.value, &fifo_request);
+            // ---- send signal to unlock all threads waiting for new requests
+            pthread_cond_broadcast(&cond_queued_req);
+            // ---- shutdown is on
+            printf("Shutdown1 - Main: %d\n", shutdown);
+            shutdown = 1;
+            printf("Shutdown2 - Main: %d\n", shutdown);
+            // ---- break cycle
+            break;
+         }
+         // ---- reply type
+         shutdown_reply.type = req.type;
+         // ---- reply length
+         shutdown_reply.length = sizeof(shutdown_reply.value);
+         // ---- create user fifo
+         user_fifo_create(&fifo_reply, req.value.header.pid);
+         // ---- write reply
+         write(fifo_reply, &shutdown_reply, sizeof(tlv_reply_t));
+      }
+      else {
+         pthread_mutex_lock(&mut);
+         // ---- enqueue the request
+         push(&request_queue, req);
+         // ---- send queued_req signal
+         pthread_cond_signal(&cond_queued_req);
 
-   // ---- write reply
-   write(fifo_request, &reply, sizeof(tlv_reply_t));
+         pthread_mutex_unlock(&mut);
+      }
+   }
+   
+   // ---- wait for threads to finish working
+   for (int i = 1; i <= num_threads; i++) {
+      pthread_join(thread_id[i], NULL);
+   }
+   
+   // ---- close and delete server/request fifo
+   close(fifo_request);
+   remove(SERVER_FIFO_PATH);
 
    return 0;
 }
 
+void* thread_work() {
+   int fifo_reply;
+   tlv_reply_t reply;
+   tlv_request_t next_request;
+
+   // ---- threads are always cheeking if there are requests available
+   while (1) {
+      // ---- lock threads
+      pthread_mutex_lock(&mut);
+
+      if (empty(&request_queue)) {
+         printf("thread: %d\n", shutdown);
+         if (shutdown) {
+            printf("here %ld\n", pthread_self());
+            break;
+         }
+         else {
+            printf("im waiting for signal: here %ld\n", pthread_self());
+            pthread_cond_wait(&cond_queued_req, &mut);
+            printf("im out: here %ld\n", pthread_self());
+         }
+      }
+
+      if (!empty(&request_queue)) {
+         printf("Thread is acknowledging a req %ld\n", pthread_self());
+         // ---- get next request
+         next_request = front(&request_queue);
+         // ---- dequeue the request
+         pop(&request_queue);
+
+         // ---- unlock threads (queue access is done)
+         pthread_mutex_unlock(&mut);
+
+         // ---- process request
+         acknowledge_request(&next_request, &reply);
+
+         // ---- create user fifo
+         user_fifo_create(&fifo_reply, next_request.value.header.pid);
+
+         // ---- write reply
+         write(fifo_reply, &reply, sizeof(tlv_reply_t));
+
+         // ---- close user fifo
+         close(fifo_reply);
+      }
+   }
+   return NULL;
+}
+
+
 static char *rand_string(char *str, size_t size) {
-   const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJK...";
+   const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
    if (size) {
      --size;
       for (size_t n = 0; n < size; n++) {
@@ -59,6 +151,8 @@ static char *rand_string(char *str, size_t size) {
 }
 
 void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply) {
+   // ---- wait for request's delay time
+   usleep(req->value.header.op_delay_ms);
    // ---- reply type
    reply->type = req->type;
 
@@ -72,13 +166,12 @@ void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply) {
             create_user_account(&req->value.create, &reply->value);
             break;
          case OP_BALANCE:
-            //check_user_balance(req->value.header.account_id, &reply->value);
+            check_user_balance(req->value.header.account_id, &reply->value);
             break;
          case OP_TRANSFER:
-            //create_user_transfer(&req->value.transfer, &reply->value);
+            create_user_transfer(req->value.header.account_id, &req->value.transfer, &reply->value);
             break;
          case OP_SHUTDOWN:
-            //shutdown_server(&reply->value);
             break;
          default:
             printf("ERROR: Invalid Operation\n");
@@ -114,31 +207,31 @@ void create_user_account(req_create_account_t* create, rep_value_t* rep_value) {
    // ---- checking if account credentials are valid
    // checking id
    if (!between(1, create->account_id, MAX_BANK_ACCOUNTS)) {
-      printf("ERROR: Invalid ID - too small or too big\n");
+      printf("\nERROR: Invalid ID - too small or too big");
       rep_value->header.ret_code = RC_OTHER;
       return;
    }
    if (create->account_id == accounts[create->account_id].account_id) {
-      printf("ERROR: Invalid ID - id already in use\n");
+      printf("\nERROR: Invalid ID - id already in use");
       rep_value->header.ret_code = RC_ID_IN_USE;
       return;
    }
    // checking balance
    if (!between(MIN_BALANCE, create->balance, MAX_BALANCE)) {
-      printf("ERROR: Invalid balance -  too little or too much\n");
+      printf("\nERROR: Invalid balance -  too little or too much");
       rep_value->header.ret_code = RC_OTHER;
       return;
    }
    // checking password
    size_t password_length = strlen(create->password);
    if (!between(MIN_PASSWORD_LEN, password_length, MAX_PASSWORD_LEN)) {
-      printf("ERROR: Invalid password - too long or too short\n");
+      printf("\nERROR: Invalid password - too long or too short");
       rep_value->header.ret_code = RC_OTHER;
       return;
    }
    // checking for spaces in password
    if (strchr(create->password, ' ') != NULL) {
-      printf("ERROR: Invalid password - password contains spaces\n");
+      printf("\nERROR: Invalid password - password contains spaces");
       rep_value->header.ret_code = RC_OTHER;
       return;
    }
@@ -149,10 +242,10 @@ void create_user_account(req_create_account_t* create, rep_value_t* rep_value) {
    // generate random salt
    char salt[SALT_LEN + 1];
    
-   strcpy(salt, rand_string(salt, 64));
+   rand_string(salt, SALT_LEN);
    strcpy(accounts[create->account_id].salt, salt);
    // generate hash
-   char command[] = "echo -n ";
+   char command[MAX_PASSWORD_LEN + SALT_LEN + 24] = "echo -n ";
 
    strcat(command, create->password);
    strcat(command, salt);
@@ -188,26 +281,27 @@ void check_user_balance(uint32_t id, rep_value_t* rep_value) {
 
 void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* rep_value) {
    printf("CREATING USER TRANSFER...");
+   rep_value->transfer.balance = accounts[transfer->account_id].balance; 
    // ---- checking if account credentials are valid
    // checking id
    if (!between(1, transfer->account_id, MAX_BANK_ACCOUNTS)) {
-      printf("ERROR: Invalid ID - too small or too big\n");
+      printf("\nERROR: Invalid ID - too small or too big");
       rep_value->header.ret_code = RC_OTHER;
       return;
    }
    if (transfer->account_id != accounts[transfer->account_id].account_id) {
-      printf("ERROR: Invalid ID - id does not exist\n");
+      printf("\nERROR: Invalid ID - id does not exist");
       rep_value->header.ret_code = RC_ID_IN_USE;
       return;
    }
    // checking funds
    if (!between(MIN_BALANCE, transfer->amount, accounts[id].balance)) {
-      printf("ERROR: Invalid transfer amount - not enough funds from sender\n");
+      printf("\nERROR: Invalid transfer amount - not enough funds from sender");
       rep_value->header.ret_code = RC_NO_FUNDS;
       return;
    }
    if (!between(MIN_BALANCE, transfer->amount + accounts[transfer->account_id].balance, MAX_BALANCE)) {
-      printf("ERROR: Invalid transfer amount - too much funds from receiver\n");
+      printf("\nERROR: Invalid transfer amount - too much funds from receiver");
       rep_value->header.ret_code = RC_NO_FUNDS;
       return;
    }
@@ -215,20 +309,23 @@ void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* re
    accounts[id].balance -= transfer->amount;
    accounts[transfer->account_id].balance += transfer->amount;
    rep_value->header.ret_code = RC_OK;
+   rep_value->transfer.balance = accounts[id].balance;
 
+   printf("\nUSER TRANSFER CREATED.\n");
 }
 
-/*
-
-void shutdown_server(rep_value_t* rep_value) {
-
+void shutdown_server(rep_value_t* rep_value, int *fifo_request) {
+   fchmod(*fifo_request, 0444);
+   // TODO, get number of active threads (not sure if this works)
+   rep_value->shutdown.active_offices = num_active_threads;
 }
-*/
+
 
 int validate_user(req_header_t *req_header, rep_header_t* reply_header) {
    // ---- check id
    // check if not admin (id != 0)
    if (is_admin(req_header->account_id)) {
+      printf("ERROR: Invalid ID - Client only operation\n");
       reply_header->ret_code = RC_OP_NALLOW;
       return 0;
    }
@@ -246,7 +343,7 @@ int validate_user(req_header_t *req_header, rep_header_t* reply_header) {
    }
    // ---- check password
    char req_hash[MAX_PASSWORD_LEN + SALT_LEN + 1];
-   char command[] = "echo -n \"";
+   char command[MAX_PASSWORD_LEN + SALT_LEN + 24] = "echo -n \"";
 
    strcat(command, req_header->password);
    strcat(command, accounts[req_header->account_id].salt);
@@ -266,6 +363,7 @@ int validate_user(req_header_t *req_header, rep_header_t* reply_header) {
 
    if (strcmp(req_hash, accounts[req_header->account_id].hash)) {
       reply_header->ret_code = RC_LOGIN_FAIL;
+      printf("ERROR: Invalid Password\n");
       return 0;
    }
    else {
@@ -277,13 +375,14 @@ int validate_user(req_header_t *req_header, rep_header_t* reply_header) {
 int validate_admin(req_header_t *req_header, rep_header_t* reply_header) {
    // ---- check if admin (id = 0)
    if (!(is_admin(req_header->account_id))) {
+      printf("ERROR: Invalid ID - Admin only operation\n");
       reply_header->ret_code = RC_OP_NALLOW;
       return 0;
    }
    // ---- check password
    char req_hash[MAX_PASSWORD_LEN + SALT_LEN + 1];
-   strcpy(req_hash, strcat(req_header->password, accounts[req_header->account_id].salt));
-   char command[] = "echo -n \"";
+   //strcpy(req_hash, strcat(req_header->password, accounts[req_header->account_id].salt));
+   char command[MAX_PASSWORD_LEN + SALT_LEN + 24] = "echo -n \"";
 
    strcat(command, req_header->password);
    strcat(command, accounts[req_header->account_id].salt);
@@ -302,6 +401,7 @@ int validate_admin(req_header_t *req_header, rep_header_t* reply_header) {
    strcpy(req_hash, strtok(hash, " "));
    
    if (strcmp(req_hash, accounts[req_header->account_id].hash)) {
+      printf("ERROR: Invalid Password\n");
       reply_header->ret_code = RC_LOGIN_FAIL;
       return 0;
    }
@@ -317,12 +417,12 @@ void create_admin_account(char* password) {
    // checking password
    size_t password_length = strlen(password);
    if (!between(MIN_PASSWORD_LEN, password_length, MAX_PASSWORD_LEN)) {
-      printf("ERROR: Invalid password\n");
+      printf("\nERROR: Invalid password");
       exit(EXIT_FAILURE);
    }
    strtok(password, " ");
    if (strlen(password) != password_length) {
-      printf("ERROR: Invalid password\n");
+      printf("\nERROR: Invalid password");
       exit(EXIT_FAILURE);
    }
 
@@ -331,10 +431,10 @@ void create_admin_account(char* password) {
    // TODO generate random salt
    char salt[SALT_LEN + 1];
    
-   strcpy(salt, rand_string(salt, 64));
+   rand_string(salt, SALT_LEN);
    strcpy(accounts[ADMIN_ACCOUNT_ID].salt, salt);
    // TODO generate hash
-   char command[] = "echo -n \"";
+   char command[MAX_PASSWORD_LEN + SALT_LEN + 24] = "echo -n \"";
 
    strcat(command, password);
    strcat(command, salt);
@@ -355,7 +455,7 @@ void create_admin_account(char* password) {
    printf("\nADMIN ACCOUNT CREATED.\n");
 }
 
-void server_fifo_create(int* fifo_reply) {
+void server_fifo_create(int* fifo_request) {
    printf("Creating server FIFO communication channels...");
 
    // ---- creating server fifo
@@ -370,8 +470,8 @@ void server_fifo_create(int* fifo_reply) {
    }
 
    // ---- opening server fifo
-   *fifo_reply = open(SERVER_FIFO_PATH, O_RDONLY | O_NONBLOCK); // | O_NONBLOCK makes so that it does not block
-   if (*fifo_reply == -1) {
+   *fifo_request = open(SERVER_FIFO_PATH, O_RDONLY | O_NONBLOCK); // | O_NONBLOCK makes so that it does not block
+   if (*fifo_request == -1) {
       printf("\nfifo_server: Open attempt failed.\n");
       exit(-1);
    }
@@ -379,7 +479,7 @@ void server_fifo_create(int* fifo_reply) {
    printf("\nChannel created and connected.\nServer is online.\n");
 }
 
-void user_fifo_create(int* fifo_request, pid_t pid) {
+void user_fifo_create(int* fifo_reply, pid_t pid) {
    printf("\nCreating user FIFO communication channels...");
 
    // ---- get user fifo path
@@ -389,7 +489,6 @@ void user_fifo_create(int* fifo_request, pid_t pid) {
    sprintf(user_fifo_path_sufix, "%d", pid);
    strcat(user_fifo_path, user_fifo_path_sufix);
 
-   printf("\nuser fifo path: %s\n", user_fifo_path);
    // ---- creating user fifo
    if (mkfifo(user_fifo_path, 0666)) {
       // If the file already exists, delete it
@@ -402,8 +501,8 @@ void user_fifo_create(int* fifo_request, pid_t pid) {
    }
 
    // ---- opening user fifo - waits for user to connect to server
-   *fifo_request = open(user_fifo_path, O_WRONLY);
-   if (*fifo_request == -1) {
+   *fifo_reply = open(user_fifo_path, O_WRONLY);
+   if (*fifo_reply == -1) {
       printf("\nfifo_user: Open attempt failed\n");
       exit(-2);
    }

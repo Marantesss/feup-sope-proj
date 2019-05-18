@@ -1,3 +1,6 @@
+#ifndef UTILS_H
+#define UTILS_H
+
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -5,6 +8,7 @@
 #include <sys/file.h>
 #include "sope.h"
 #include "log.c"
+
 
 /**
  * 
@@ -20,3 +24,5 @@
  * 
  */
 #define is_admin(id) id == 0 ? 1 : 0
+
+#endif

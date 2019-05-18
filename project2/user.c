@@ -6,6 +6,7 @@ int main(int argc, char *argv[]){
    int fifo_reply, fifo_request;
    int logfile;
    logfile = open(USER_LOGFILE, O_APPEND);
+   char user_fifo_path[USER_FIFO_PATH_LEN];
 
    setbuf(stdout, NULL); // prints stuff without needing \n
 
@@ -32,16 +33,24 @@ int main(int argc, char *argv[]){
    // ---- write request
    write(fifo_request, &request, sizeof(tlv_request_t));
 
+   // ---- close server/request fifo
+   close(fifo_request);
+
    // ---- connect to user/reply fifo
-   user_connect_fifo_reply(&fifo_reply);
+   user_connect_fifo_reply(&fifo_reply, user_fifo_path);
 
    // ---- read reply
    read_reply(fifo_reply, &reply);
    logReply(logfile, reply.value.header.account_id, &reply);
 
-   // ---- Print reply (Reply may not be successfull - show errors with return code)
+   // ---- print reply (Reply may not be successfull - show errors with return code)
    print_reply(&reply);
 
+   // ---- close and delete user/reply fifo
+   close(fifo_reply);
+   remove(user_fifo_path);
+
+   // ---- close ulog
    close(logfile);
 
    return 0;
@@ -60,12 +69,11 @@ void user_connect_server(int *fifo_request){
    printf("\nChannel opened.\nUser %d connected to server.\n", getpid());
 }
 
-void user_connect_fifo_reply(int *fifo_reply){
+void user_connect_fifo_reply(int *fifo_reply, char* user_fifo_path) {
    printf("Opening User/Reply FIFO communication channel...");
 
    // ---- opening user fifo - waits for server to create fifo and connect to user
-   // get user fifo path name
-   char user_fifo_path[USER_FIFO_PATH_LEN];
+   // get user fifo path name;
    get_user_fifo_path(user_fifo_path);
    // wait for user fifo to be created
    while (access(user_fifo_path, F_OK))
@@ -80,7 +88,7 @@ void user_connect_fifo_reply(int *fifo_reply){
    printf("\nChannel opened.\n");
 }
 
-void get_user_fifo_path(char *user_fifo_path){
+void get_user_fifo_path(char *user_fifo_path) {
 
    strcpy(user_fifo_path, USER_FIFO_PATH_PREFIX);
    char user_fifo_path_sufix[WIDTH_ID + 1];
@@ -91,6 +99,8 @@ void get_user_fifo_path(char *user_fifo_path){
 void get_request(char *argv[], tlv_request_t *request){
    int arg_receiver, id_op;
    char *token;
+
+   printf("WARNING: No verifications are being made to command arguments!!!\n");
 
    // **** id da conta
    arg_receiver = atoi(argv[1]);
@@ -173,7 +183,7 @@ int print_reply(tlv_reply_t *reply){
          printf("TRANSFER SUCCESSFUL. BALANCE IS NOW %d\n", reply->value.transfer.balance);
          break;
       case OP_SHUTDOWN: //desliga o servidor acho eu
-         printf("SERVER SHUTDOWN. %d SERVERS REMAINING\n", reply->value.shutdown.active_offices);
+         printf("SERVER SHUTDOWN. %d ACTIVE OFFICES REMAINING\n", reply->value.shutdown.active_offices);
          break;
       default:
          break;
@@ -227,22 +237,3 @@ int readline(int fd, char *str){
 
    return (n > 0);
 }
-
-/*
-void create_test_request(tlv_request_t* req) {
-   // ---- type
-   req.type = OP_CREATE_ACCOUNT;
-   // ---- value
-   // header
-   req.value.header.account_id = 0;
-   req.value.header.op_delay_ms = 10;
-   strcpy(req.value.header.password,"olaolaol");
-   req.value.header.pid = getpid();
-   // create
-   req.value.create.account_id = 2;
-   req.value.create.balance = 100;
-   strcpy(req.value.create.password, "ola");
-   // ---- length
-   req.length = sizeof(req.value);
-}
-*/

@@ -1,4 +1,8 @@
+#ifndef SERVER_H
+#define SERVER_H
+
 #include "utils.h"
+#include "queue.h"
 
 /**
  * 
@@ -9,6 +13,41 @@ bank_account_t accounts[MAX_BANK_ACCOUNTS];
  * 
  */
 int num_threads;
+
+/**
+ * 
+ */
+int num_active_threads = 0;
+
+/**
+ * 
+ */
+pthread_t thread_id[MAX_BANK_OFFICES];
+
+/**
+ * 
+ */
+pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
+
+/**
+ * 
+ */
+int shutdown = 0;
+
+/**
+ * 
+ */
+pthread_cond_t cond_queued_req = PTHREAD_COND_INITIALIZER;
+
+/**
+ * 
+ */
+queue_t request_queue;
+
+/**
+ * 
+ */
+void* thread_work();
 
 /**
  * 
@@ -52,18 +91,18 @@ void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* re
 
 /**
  * 
-void shutdown_server(rep_value_t* rep_value);
  */
+void shutdown_server(rep_value_t* rep_value, int *fifo_request);
 
 /**
  * 
  */
-void server_fifo_create(int* fifo_server);
+void server_fifo_create(int* fifo_request);
 
 /**
  * 
  */
-void user_fifo_create(int* fifo_user, pid_t pid);
+void user_fifo_create(int* fifo_reply, pid_t pid);
 
 /**
  * 
@@ -74,3 +113,5 @@ int readline(int fd, char *str);
  * 
  */
 int read_request(int fd, tlv_request_t* req);
+
+#endif
