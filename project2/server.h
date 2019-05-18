@@ -107,11 +107,6 @@ void user_fifo_create(int* fifo_reply, pid_t pid);
 /**
  * 
  */
-int readline(int fd, char *str);
-
-/**
- * 
- */
 int read_request(int fd, tlv_request_t* req);
 
 #endif

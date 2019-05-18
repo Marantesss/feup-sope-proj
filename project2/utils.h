@@ -24,4 +24,9 @@
  */
 #define is_admin(id) id == 0 ? 1 : 0
 
+/**
+ * 
+ */
+char *rand_string(char *str, size_t size);
+
 #endif

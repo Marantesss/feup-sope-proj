@@ -31,13 +31,9 @@ int main(int argc, char *argv[]) {
 
    while (1) {
       // ---- getting request from user
-      printf("Waiting for user request!");
+      printf("Waiting for user request...");
       tlv_request_t req;
-      while(!read_request(fifo_request, &req)) {
-         sleep(1);
-         printf("\nstuck in read_request");
-      }
-      printf("\n");
+      while(!read_request(fifo_request, &req));
 
       // ---- main thread should take care of shutdown requests
       if (req.type == OP_SHUTDOWN) {
@@ -48,10 +44,14 @@ int main(int argc, char *argv[]) {
             shutdown_server(&shutdown_reply.value, &fifo_request);
             // ---- send signal to unlock all threads waiting for new requests
             pthread_cond_broadcast(&cond_queued_req);
-            // ---- shutdown is on
-            printf("Shutdown1 - Main: %d\n", shutdown);
-            shutdown = 1;
-            printf("Shutdown2 - Main: %d\n", shutdown);
+            // ---- reply type
+            shutdown_reply.type = req.type;
+            // ---- reply length
+            shutdown_reply.length = sizeof(shutdown_reply.value);
+            // ---- create user fifo
+            user_fifo_create(&fifo_reply, req.value.header.pid);
+            // ---- write reply
+            write(fifo_reply, &shutdown_reply, sizeof(tlv_reply_t));
             // ---- break cycle
             break;
          }
@@ -94,24 +94,21 @@ void* thread_work() {
 
    // ---- threads are always cheeking if there are requests available
    while (1) {
-      // ---- lock threads
-      pthread_mutex_lock(&mut);
+      // ---- lock threads if not shutdown
+      if (!shutdown)
+         pthread_mutex_lock(&mut);
+      else
+         pthread_mutex_unlock(&mut);
 
       if (empty(&request_queue)) {
-         printf("thread: %d\n", shutdown);
-         if (shutdown) {
-            printf("here %ld\n", pthread_self());
+         if (shutdown)
             break;
-         }
-         else {
-            printf("im waiting for signal: here %ld\n", pthread_self());
+         else
             pthread_cond_wait(&cond_queued_req, &mut);
-            printf("im out: here %ld\n", pthread_self());
-         }
       }
+      
 
       if (!empty(&request_queue)) {
-         printf("Thread is acknowledging a req %ld\n", pthread_self());
          // ---- get next request
          next_request = front(&request_queue);
          // ---- dequeue the request
@@ -134,20 +131,6 @@ void* thread_work() {
       }
    }
    return NULL;
-}
-
-
-static char *rand_string(char *str, size_t size) {
-   const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-   if (size) {
-     --size;
-      for (size_t n = 0; n < size; n++) {
-         int key = rand() % (int) (sizeof charset - 1);
-         str[n] = charset[key];
-      }
-      str[size] = '\0';
-   }
-   return str;
 }
 
 void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply) {
@@ -316,6 +299,7 @@ void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* re
 
 void shutdown_server(rep_value_t* rep_value, int *fifo_request) {
    fchmod(*fifo_request, 0444);
+   shutdown = 1;
    // TODO, get number of active threads (not sure if this works)
    rep_value->shutdown.active_offices = num_active_threads;
 }
@@ -508,16 +492,6 @@ void user_fifo_create(int* fifo_reply, pid_t pid) {
    }
 
    printf("\n%s channel created.\n", user_fifo_path);
-}
-
-int readline(int fd, char *str) {
-   int n;
-
-   do { 
-      n = read(fd, str, 1);
-   } while (n > 0 && *str++ != '\0');
-
-   return (n>0); 
 }
 
 int read_request(int fd, tlv_request_t* req) {
