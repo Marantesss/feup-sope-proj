@@ -3,10 +3,14 @@
 int main(int argc, char *argv[]) {
    int fifo_request;
 
+   logfile = open(SERVER_LOGFILE, O_CREAT | O_APPEND | O_RDWR);
+   if (logfile == -1) {
+      printf("ERROR: Could not create and open logfile\n");
+      exit(EXIT_FAILURE);
+   }
+
    setbuf(stdout, NULL); // prints stuff without needing \n
    
-   printf("WARNING: No verifications are being made to command arguments!!!\n");
-
    if(argc != 3) {
       printf("Too few arguments\n");
       exit(EXIT_FAILURE);
@@ -19,16 +23,18 @@ int main(int argc, char *argv[]) {
 
    // ---- create admin account
    create_admin_account(argv[2]);
+   logAccountCreation(logfile, MAIN_THREAD_ID, &accounts[ADMIN_ACCOUNT_ID]);
 
    // ---- create server/request fifo
    server_fifo_create(&fifo_request);
 
    // ---- send threads to work
    for (int i = 0; i < num_threads; i++) {
-      pthread_create(&thread_id[i], NULL, thread_work, NULL);
+      thread_arg[i] = i + 1;
+      pthread_create(&thread_id[i], NULL, thread_work, (void *)&thread_arg[i]);
    }
    
-   printf("Waiting for user request...");
+   printf("\nWaiting for user request...");
 
    while (1) {
       // ---- getting request from user
@@ -40,10 +46,14 @@ int main(int argc, char *argv[]) {
          tlv_reply_t shutdown_reply;
          int fifo_reply;
          if (validate_request(&req, &shutdown_reply)) {
+            shutdown_req_pid = req.value.header.account_id;
+            // ---- Log the delay introduced (server shutdown only)
+            logDelay(logfile, MAIN_THREAD_ID, req.value.header.op_delay_ms);
             // ---- command
             shutdown_server(&shutdown_reply.value, &fifo_request);
             // ---- send signal to unlock all threads waiting for new requests
             pthread_cond_broadcast(&cond_queued_req);
+            logSyncMech(logfile, MAIN_THREAD_ID, SYNC_OP_COND_SIGNAL, SYNC_ROLE_PRODUCER, shutdown_req_pid);
             // ---- reply type
             shutdown_reply.type = req.type;
             // ---- reply length
@@ -65,56 +75,80 @@ int main(int argc, char *argv[]) {
          write(fifo_reply, &shutdown_reply, sizeof(tlv_reply_t));
       }
       else {
+         logSyncMech(logfile, MAIN_THREAD_ID, SYNC_OP_MUTEX_LOCK, SYNC_ROLE_PRODUCER, req.value.header.account_id);
          pthread_mutex_lock(&queue_mut);
          // ---- enqueue the request
          push(&request_queue, req);
          // ---- send queued_req signal
          pthread_cond_signal(&cond_queued_req);
+         logSyncMech(logfile, MAIN_THREAD_ID, SYNC_OP_COND_SIGNAL, SYNC_ROLE_PRODUCER, req.value.header.account_id);
 
          pthread_mutex_unlock(&queue_mut);
+         logSyncMech(logfile, MAIN_THREAD_ID, SYNC_OP_MUTEX_UNLOCK, SYNC_ROLE_PRODUCER, req.value.header.account_id);
       }
    }
    
+   printf("\nWaiting for offices to close!\n");
    // ---- wait for threads to finish working
-   for (int i = 1; i <= num_threads; i++) {
+   for (int i = 0; i < num_threads; i++) {
       pthread_join(thread_id[i], NULL);
    }
+   printf("\nOffices closed!\n");
    
    // ---- close and delete server/request fifo
    close(fifo_request);
    remove(SERVER_FIFO_PATH);
 
+   // ---- close slog
+   close(logfile);
+
    return 0;
 }
 
-void* thread_work() {
+void* thread_work(void* office_id) {
    int fifo_reply;
    tlv_reply_t reply;
    tlv_request_t next_request;
 
+   logBankOfficeOpen(logfile, *(int *) thread_id, pthread_self());
+
    // ---- threads are always cheeking if there are requests available
    while (1) {
       // ---- lock threads if not shutdown
-      if (!shutdown)
+      if (!shutdown) {
+         logSyncMech(logfile, *(int *) thread_id, SYNC_OP_MUTEX_LOCK, SYNC_ROLE_CONSUMER, getpid());
          pthread_mutex_lock(&queue_mut);
-      else
+      }
+      else {
          pthread_mutex_unlock(&queue_mut);
+         logSyncMech(logfile, *(int *) thread_id, SYNC_OP_MUTEX_UNLOCK, SYNC_ROLE_CONSUMER, shutdown_req_pid);
+      }
 
+      // ---- if request queue is empty and shutodwn is set, break the loop and close offices
       if (empty(&request_queue)) {
          if (shutdown)
             break;
-         else
+         else {
+            logSyncMech(logfile, *(int *) thread_id, SYNC_OP_COND_WAIT, SYNC_ROLE_CONSUMER, getpid());
             pthread_cond_wait(&cond_queued_req, &queue_mut);
+         }
       }
       
 
       if (!empty(&request_queue)) {
+         // ---- get next request
+         next_request = front(&request_queue);
+         
+         // ---- Log the delay introduced immediately after entering the critical section of an account
+         logSyncDelay(logfile, *(int *) thread_id, next_request.value.header.account_id, next_request.value.header.op_delay_ms);
+
+         // ---- increment active threads
+         logSyncMech(logfile, *(int *) thread_id, SYNC_OP_MUTEX_LOCK, SYNC_ROLE_CONSUMER, next_request.value.header.account_id);
          pthread_mutex_lock(&counter_mut);
          num_active_threads++;
          pthread_mutex_unlock(&counter_mut);
+         logSyncMech(logfile, *(int *) thread_id, SYNC_OP_MUTEX_UNLOCK, SYNC_ROLE_CONSUMER, next_request.value.header.account_id);
 
-         // ---- get next request
-         next_request = front(&request_queue);
          // ---- dequeue the request
          pop(&request_queue);
 
@@ -122,7 +156,7 @@ void* thread_work() {
          pthread_mutex_unlock(&queue_mut);
 
          // ---- process request
-         acknowledge_request(&next_request, &reply);
+         acknowledge_request(&next_request, &reply, *(int *) office_id);
 
          // ---- create user fifo
          user_fifo_create(&fifo_reply, next_request.value.header.pid);
@@ -133,17 +167,23 @@ void* thread_work() {
          // ---- close user fifo
          close(fifo_reply);
 
+         // ---- decrement active threads
+         logSyncMech(logfile, *(int *) thread_id, SYNC_OP_MUTEX_LOCK, SYNC_ROLE_CONSUMER, next_request.value.header.account_id);
          pthread_mutex_lock(&counter_mut);
          num_active_threads--;
          pthread_mutex_unlock(&counter_mut);
+         logSyncMech(logfile, *(int *) thread_id, SYNC_OP_MUTEX_UNLOCK, SYNC_ROLE_CONSUMER, next_request.value.header.account_id);
 
          printf("Waiting for user request...");
       }
    }
+
+   logBankOfficeClose(logfile, *(int *) office_id, pthread_self());
+
    return NULL;
 }
 
-void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply) {
+void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply, int office_id) {
    // ---- wait for request's delay time
    usleep(req->value.header.op_delay_ms);
    // ---- reply type
@@ -156,7 +196,8 @@ void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply) {
    if (validate_request(req, reply))
       switch (req->type) {
          case OP_CREATE_ACCOUNT:
-            create_user_account(&req->value.create, &reply->value);
+            if (create_user_account(&req->value.create, &reply->value))
+               logAccountCreation(logfile, office_id, &accounts[req->value.create.account_id]);
             break;
          case OP_BALANCE:
             check_user_balance(req->value.header.account_id, &reply->value);
@@ -195,38 +236,38 @@ int validate_request(tlv_request_t *req, tlv_reply_t *reply) {
    return 0;
 }
 
-void create_user_account(req_create_account_t* create, rep_value_t* rep_value) {
-   printf("CREATING USER ACCOUNT...");
+int create_user_account(req_create_account_t* create, rep_value_t* rep_value) {
+   printf("\nCREATING USER ACCOUNT...");
    // ---- checking if account credentials are valid
    // checking id
    if (!between(1, create->account_id, MAX_BANK_ACCOUNTS)) {
       printf("\nERROR: Invalid ID - too small or too big");
       rep_value->header.ret_code = RC_OTHER;
-      return;
+      return 1;
    }
    if (create->account_id == accounts[create->account_id].account_id) {
       printf("\nERROR: Invalid ID - id already in use");
       rep_value->header.ret_code = RC_ID_IN_USE;
-      return;
+      return 1;
    }
    // checking balance
    if (!between(MIN_BALANCE, create->balance, MAX_BALANCE)) {
       printf("\nERROR: Invalid balance -  too little or too much");
       rep_value->header.ret_code = RC_OTHER;
-      return;
+      return 1;
    }
    // checking password
    size_t password_length = strlen(create->password);
    if (!between(MIN_PASSWORD_LEN, password_length, MAX_PASSWORD_LEN)) {
       printf("\nERROR: Invalid password - too long or too short");
       rep_value->header.ret_code = RC_OTHER;
-      return;
+      return 1;
    }
    // checking for spaces in password
    if (strchr(create->password, ' ') != NULL) {
       printf("\nERROR: Invalid password - password contains spaces");
       rep_value->header.ret_code = RC_OTHER;
-      return;
+      return 1;
    }
 
    // ---- creating account
@@ -261,10 +302,12 @@ void create_user_account(req_create_account_t* create, rep_value_t* rep_value) {
    rep_value->header.ret_code = RC_OK;
 
    printf("\nUSER ACCOUNT CREATED.\n");
+
+   return 0;
 }
 
 void check_user_balance(uint32_t id, rep_value_t* rep_value) {
-   printf("CHECKING USER BALANCE...");
+   printf("\nCHECKING USER BALANCE...");
 
    rep_value->transfer.balance = accounts[id].balance;
    rep_value->header.ret_code = RC_OK;
@@ -273,7 +316,7 @@ void check_user_balance(uint32_t id, rep_value_t* rep_value) {
 }
 
 void create_user_transfer(uint32_t id, req_transfer_t* transfer, rep_value_t* rep_value) {
-   printf("CREATING USER TRANSFER...");
+   printf("\nCREATING USER TRANSFER...");
    rep_value->transfer.balance = accounts[transfer->account_id].balance; 
    // ---- checking if account credentials are valid
    // checking id

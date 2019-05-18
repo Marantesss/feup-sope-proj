@@ -4,19 +4,19 @@ CFLAGS=-Wall -Wextra -Werror -pedantic
 all: utils queue log user server
 
 utils: utils.c
-	$(CC) $(CFLAGS) -c -o utils.o utils.c
+	$(CC) $(CFLAGS) -c -o utils utils.c
 
 queue: queue.c
-	$(CC) $(CFLAGS) -c -o queue.o queue.c
+	$(CC) $(CFLAGS) -c -o queue queue.c
 
 log: log.c
-	$(CC) $(CFLAGS) -c -o log.o log.c
+	$(CC) $(CFLAGS) -c -o log log.c
 
 user: user.c
-	$(CC) $(CFLAGS) -o user.o user.c log.o
+	$(CC) $(CFLAGS) -o user user.c log
 
 server: server.c
-	$(CC) $(CFLAGS) -pthread -o server.o server.c queue.o utils.o log.o
+	$(CC) $(CFLAGS) -pthread -o server server.c queue utils log
 
 clean:
-	rm -f *.o *.d
+	rm -f *.o *.d utils queue log user server

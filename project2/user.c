@@ -5,9 +5,14 @@ int main(int argc, char *argv[]){
    tlv_reply_t reply;
    int fifo_reply, fifo_request;
    int logfile;
-   logfile = open(USER_LOGFILE, O_CREAT | O_APPEND | O_RDWR);
    char user_fifo_path[USER_FIFO_PATH_LEN];
 
+   logfile = open(USER_LOGFILE, O_CREAT | O_APPEND | O_RDWR);
+   if (logfile == -1) {
+      printf("ERROR: Could not create and open logfile\n");
+      exit(EXIT_FAILURE);
+   }
+   
    setbuf(stdout, NULL); // prints stuff without needing \n
 
    // ---- checking the minimum ammount of argumrnts
@@ -23,12 +28,12 @@ int main(int argc, char *argv[]){
       exit(EXIT_FAILURE);
    }
 
-   // ---- connect to server/request fifo
-   user_connect_server(&fifo_request);
-
    // ---- get request
    get_request(argv, &request);
    logRequest(logfile, request.value.header.pid, &request);
+
+   // ---- connect to server/request fifo
+   user_connect_server(&fifo_request);
 
    // ---- write request
    write(fifo_request, &request, sizeof(tlv_request_t));

@@ -17,6 +17,16 @@ int num_threads;
 /**
  * 
  */
+int logfile;
+
+/**
+ * 
+ */
+int shutdown_req_pid;
+
+/**
+ * 
+ */
 int num_active_threads = 0;
 
 /**
@@ -27,12 +37,19 @@ pthread_t thread_id[MAX_BANK_OFFICES];
 /**
  * 
  */
+int thread_arg[MAX_BANK_OFFICES];
+
+/**
+ * 
+ */
 pthread_mutex_t queue_mut = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * 
  */
 pthread_mutex_t counter_mut = PTHREAD_MUTEX_INITIALIZER;
+
+pthread_mutex_t log_mut = PTHREAD_MUTEX_INITIALIZER;
 
 /**
  * 
@@ -52,12 +69,12 @@ queue_t request_queue;
 /**
  * 
  */
-void* thread_work();
+void* thread_work(void * thread_id);
 
 /**
  * 
  */
-void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply);
+void acknowledge_request(tlv_request_t *req, tlv_reply_t *reply, int office_id);
 
 /**
  * 
@@ -82,7 +99,7 @@ void create_admin_account(char* password);
 /**
  * 
  */
-void create_user_account(req_create_account_t* create, rep_value_t* rep_value);
+int create_user_account(req_create_account_t* create, rep_value_t* rep_value);
 
 /**
  * 
