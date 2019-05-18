@@ -10,7 +10,7 @@ queue: queue.c
 	$(CC) $(CFLAGS) -c -o queue.o queue.c
 
 user: user.c
-	$(CC) $(CFLAGS) -o user.o user.c
+	$(CC) $(CFLAGS) -o user.o user.c log.c
 
 server: server.c
 	$(CC) $(CFLAGS) -pthread -o server.o server.c queue.o utils.o

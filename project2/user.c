@@ -1,12 +1,11 @@
 #include "user.h"
-#include "log.c"
 
 int main(int argc, char *argv[]){
    tlv_request_t request;
    tlv_reply_t reply;
    int fifo_reply, fifo_request;
    int logfile;
-   logfile = open(USER_LOGFILE, O_APPEND);
+   logfile = open(USER_LOGFILE, O_CREAT | O_APPEND | O_RDWR);
    char user_fifo_path[USER_FIFO_PATH_LEN];
 
    setbuf(stdout, NULL); // prints stuff without needing \n
@@ -29,7 +28,7 @@ int main(int argc, char *argv[]){
 
    // ---- get request
    get_request(argv, &request);
-   logRequest(logfile,request.value.header.pid, &request);
+   logRequest(logfile, request.value.header.pid, &request);
 
    // ---- write request
    write(fifo_request, &request, sizeof(tlv_request_t));
